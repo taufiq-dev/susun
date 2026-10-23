@@ -41,7 +41,13 @@ Main-process IPC handlers are registered in `src/main/ipc.ts` (`registerIpc()`, 
 
 ### Planned architecture (agreed with the user, not built yet)
 
-- Database drivers (`pg`, `mysql2`, `better-sqlite3`) run only in the main process, behind one `DbClient` interface (`connect`, `disconnect`, `listTables`, `listColumns`, `query`) with one implementation file per database. PostgreSQL, MySQL and SQLite first.
+- Database drivers (`pg`, `mysql2`, `better-sqlite3`) run only in the main process, behind one `DbClient` interface (`connect`, `disconnect`, `listTables`, `listColumns`, `query`) with one implementation file per database. PostgreSQL, MySQL and SQLite first. **Built:** `src/main/db/` (`client.ts` interface, `postgres.ts`, `mysql.ts`, `sqlite.ts`, `createClient(config)` in `index.ts`); the config and result types are in `src/shared/types.ts`.
+- `DbClient` contract every implementation keeps:
+  - Each client holds one driver connection, so a transaction can span calls.
+  - `query` rows are arrays in `columns` order, so duplicate column names survive.
+  - Integers that don't fit a JS number arrive as strings, never rounded (Postgres `int8` is always a string).
+  - A statement that returns no rows gives empty `columns`/`rows` and its affected-row count.
+  - Each client attaches an `'error'` listener, since an unhandled driver `'error'` event crashes the main process.
 - The renderer reaches the database only through typed methods on `window.api` (`ipcMain.handle` / `ipcRenderer.invoke`, channels like `db:query`). New features should not use the raw `window.electron.ipcRenderer`.
 - Saved connections in a SQLite file under `app.getPath('userData')`; passwords encrypted with `safeStorage`.
 - No router: `App` shows a connect screen or the workspace based on state, and open tabs live in a Zustand store. If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.

@@ -6,6 +6,13 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 ## Open decisions (ask the user before acting)
 
 - **License for Trowel** (GPLv3 vs MIT/closed): decides whether any Beekeeper Studio GPLv3 code may be ported.
+- **Multi-statement scripts**: `query` returns one result. Postgres runs a multi-statement script (no params)
+  and returns the last result; MySQL and SQLite reject it. A result per statement would need SQL splitting for
+  SQLite, plus `multipleStatements` for mysql2. Decide before step 9.
+- **SSL/TLS** for Postgres and MySQL: not in `ServerConnectionConfig` yet. Most hosted databases (RDS, Neon,
+  Supabase, PlanetScale) require it. Decide before step 8's form.
+- **SQLite blocks the main process**: `better-sqlite3` is synchronous, so a slow SQLite query freezes all IPC
+  until it ends. A worker thread would fix it. Fine for now; revisit if it hurts.
 
 ## Steps
 
@@ -25,9 +32,11 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   (and include `src/shared` in both). Done: empty folders hold a `.gitkeep` (delete it when the first file lands);
   `src/shared/types.ts` has `DB_TYPES`/`DbType`; the template's `ping` handler moved into `registerIpc()` in
   `ipc.ts`. `connections.ts` is left for step 7 rather than added as an empty module.
-- [ ] **5. `DbClient` interface** — `src/main/db/client.ts` with `connect`, `disconnect`, `listTables`,
+- [x] **5. `DbClient` interface** — `src/main/db/client.ts` with `connect`, `disconnect`, `listTables`,
   `listColumns`, `query(sql, params?)`. `TableInfo`, `ColumnInfo`, `QueryResult` (`columns`, `rows`, `rowCount`,
-  `durationMs`) in `src/shared/types.ts`. Implement `postgres.ts`, `mysql.ts`, `sqlite.ts`.
+  `durationMs`) in `src/shared/types.ts`. Implement `postgres.ts`, `mysql.ts`, `sqlite.ts`. Done, plus
+  `ConnectionConfig`/`TableRef` in shared types and `createClient(config)` in `src/main/db/index.ts`. Contract
+  in `CLAUDE.md`. Tested by hand against Postgres 18, MariaDB 13 and SQLite 3.53 (no test runner yet).
 - [ ] **6. IPC** — `src/main/ipc.ts` keeps a `Map` of open clients by connection id and registers `ipcMain.handle`
   for `db:connect`, `db:disconnect`, `db:listTables`, `db:listColumns`, `db:query`. Preload exposes matching
   methods on `window.api` via `ipcRenderer.invoke`; type them in `src/preload/index.d.ts`.
@@ -39,13 +48,15 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   `{ type: 'query', sql }` or `{ type: 'table', table }`.
 - [ ] **9. Query tab** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor. Results in AG Grid
   with row count and run time; show database errors in place of the grid. Register AG Grid modules once in
-  `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`.
+  `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`. Rows arrive as arrays: give each
+  grid column the index as its `field` (or a `valueGetter`), not the column name, which may repeat.
 - [ ] **10. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a
   primary key are read-only.
 - [ ] **11. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`
-  (folding included), plus a key filter box. Convert first: `Uint8Array` → hex, Postgres `bigint` arrives as a
+  (folding included), plus a key filter box. Build the row object from `columns` (suffix repeated names, e.g.
+  `id`, `id_2`). Convert first: `Uint8Array` → hex, Postgres `bigint` arrives as a
   string, dates → ISO strings. Postgres/MySQL JSON columns arrive parsed and show as nested objects.
 - [ ] **12. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
