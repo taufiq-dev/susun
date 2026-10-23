@@ -11,21 +11,21 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   SQLite, plus `multipleStatements` for mysql2. Decide before step 9.
 - **SSL/TLS** for Postgres and MySQL: not in `ServerConnectionConfig` yet. Most hosted databases (RDS, Neon,
   Supabase, PlanetScale) require it. Decide before step 8's form.
-- **SQLite blocks the main process** (decide before step 6, since option 2 changes the IPC layer):
-  `better-sqlite3` is synchronous, so a slow SQLite query blocks the main process until it ends. The window
-  stays drawn and React still responds, but every database call, native menu and file dialog waits, and
-  the query can't be cancelled.
-  - Beekeeper Studio, for comparison: uses the same driver and also runs SQLite queries synchronously, and its
-    SQLite `cancel()` doesn't interrupt a running query (`apps/studio/src/lib/db/clients/sqlite.ts`). But it runs
-    every database client in an Electron utility process that the renderer reaches over a `MessagePort`
-    (`src/lib/utility/UtilityConnection.ts`). So the main process, window and menus stay free, while other
-    database requests still queue behind the slow query.
-  - Option 1, worker thread for SQLite only: the smallest change, limited to `sqlite.ts`. Postgres and MySQL
-    aren't held up, and terminating the worker cancels the query.
-  - Option 2, utility process for all drivers (Beekeeper's approach): needs a separate entry point and a
-    `MessagePort` instead of `ipcMain.handle`. It also keeps a native driver crash from taking down the main
-    process.
-  - Option 3, keep it as is: fine for small SQLite files.
+- **Cancelling SQLite queries** (decide before step 9 if it needs a cancel button): `better-sqlite3` has no
+  interrupt, and `worker.terminate()` waits for the running native call. So a SQLite query can't be stopped,
+  and quitting the app during one waits for it to finish (measured: an 8.4 s wait). Fix if needed: run each SQLite
+  connection in an Electron `utilityProcess` instead of a worker thread. Killing a process is immediate and
+  SQLite's journal makes it safe, so that gives a real cancel and an instant quit, still only inside
+  `sqlite.ts`/`sqlite.worker.ts`. Postgres cancel (`pg_cancel_backend`) and MySQL cancel (`KILL QUERY`) would
+  each need a second connection.
+
+## Decided
+
+- **SQLite off the main process: worker thread per connection** (option 1 of three; the others were a
+  utility process for all drivers as Beekeeper Studio does, or leaving it). Measured during a 9.8 s SQLite
+  query: Postgres answered in 3–7 ms, and a second SQLite connection in 3 ms. It doesn't make queries
+  cancellable (see the open decision above). Beekeeper Studio has the same limit: its SQLite `cancel()` doesn't
+  interrupt a running query.
 
 ## Steps
 
@@ -50,9 +50,12 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   `durationMs`) in `src/shared/types.ts`. Implement `postgres.ts`, `mysql.ts`, `sqlite.ts`. Done, plus
   `ConnectionConfig`/`TableRef` in shared types and `createClient(config)` in `src/main/db/index.ts`. Contract
   in `CLAUDE.md`. Tested by hand against Postgres 18, MariaDB 13 and SQLite 3.53 (no test runner yet).
-- [ ] **6. IPC** — `src/main/ipc.ts` keeps a `Map` of open clients by connection id and registers `ipcMain.handle`
+- [x] **6. IPC** — `src/main/ipc.ts` keeps a `Map` of open clients by connection id and registers `ipcMain.handle`
   for `db:connect`, `db:disconnect`, `db:listTables`, `db:listColumns`, `db:query`. Preload exposes matching
-  methods on `window.api` via `ipcRenderer.invoke`; type them in `src/preload/index.d.ts`.
+  methods on `window.api` via `ipcRenderer.invoke`; type them in `src/preload/index.d.ts`. Done as
+  `window.api.db.*`, typed by `Api` in `src/shared/api.ts`. `connect` returns a UUID connection id, errors reach the
+  renderer as plain `Error`s with the driver's message, and a window's connections close when it closes or
+  reloads. Tested end to end in the built app over the DevTools protocol (Postgres 18, MariaDB 13, SQLite).
 - [ ] **7. Saved connections** — SQLite file under `app.getPath('userData')` via `better-sqlite3`; encrypt
   passwords with `safeStorage.encryptString()`.
 - [ ] **8. App shell** — `App.tsx` renders `ConnectScreen` or `Workspace` from state. Connect screen: saved list +

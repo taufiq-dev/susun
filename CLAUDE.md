@@ -32,23 +32,31 @@ VS Code: the "Debug All" launch config debugs main and renderer together (render
 electron-vite builds three targets from `electron.vite.config.ts`, output to `out/main`, `out/preload`, `out/renderer`:
 
 - `src/main/` — Electron main process (Node). `index.ts` creates the `BrowserWindow`; it loads `ELECTRON_RENDERER_URL` in dev and `out/renderer/index.html` when built.
-- `src/preload/` — runs before the page with `contextIsolation` on and `sandbox: false`. Exposes `window.electron` (the `@electron-toolkit/preload` wrapper, which can send on any IPC channel) and `window.api` (custom, currently empty). Types for both live in `src/preload/index.d.ts`, which `tsconfig.web.json` includes so the renderer sees them.
+- `src/preload/` — runs before the page with `contextIsolation` on and `sandbox: false`. Exposes `window.electron` (the `@electron-toolkit/preload` wrapper, which can send on any IPC channel) and `window.api` (Trowel's own API, typed as `Api` in `src/shared/api.ts`; see below). Types for both live in `src/preload/index.d.ts`, which `tsconfig.web.json` includes so the renderer sees them.
 - `src/renderer/` — the React app. `index.html` sets a strict Content-Security-Policy (`script-src 'self'`, no remote connections), so inline scripts and remote resources are blocked until the CSP is changed. `@renderer` aliases `src/renderer/src` (renderer only).
 
 Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite config) and `tsconfig.web.json` (renderer, shared, preload `.d.ts`). Code used by both sides lives in `src/shared/` and is imported as `@shared/…` from main, preload and renderer. The alias is defined in all three sections of `electron.vite.config.ts` and in `paths` of both tsconfigs, so a new alias needs the same treatment. Both projects type-check `src/shared/`, so it must not use Node, Electron or DOM APIs.
 
-Main-process IPC handlers are registered in `src/main/ipc.ts` (`registerIpc()`, called from `index.ts`).
+### Database access and IPC
 
-### Planned architecture (agreed with the user, not built yet)
-
-- Database drivers (`pg`, `mysql2`, `better-sqlite3`) run only in the main process, behind one `DbClient` interface (`connect`, `disconnect`, `listTables`, `listColumns`, `query`) with one implementation file per database. PostgreSQL, MySQL and SQLite first. **Built:** `src/main/db/` (`client.ts` interface, `postgres.ts`, `mysql.ts`, `sqlite.ts`, `createClient(config)` in `index.ts`); the config and result types are in `src/shared/types.ts`.
+- Database drivers (`pg`, `mysql2`, `better-sqlite3`) run only in the main process, behind the `DbClient` interface in `src/main/db/client.ts`: one file per database (`postgres.ts`, `mysql.ts`, `sqlite.ts`), and `createClient(config)` in `src/main/db/index.ts`. The config and result types are in `src/shared/types.ts`.
+- SQLite runs each connection on its own worker thread, because `better-sqlite3` is synchronous. The worker is `sqlite.worker.ts`, loaded with electron-vite's `?nodeWorker` import. A query already running inside SQLite can't be interrupted. `disconnect` rejects pending calls at once, but the thread, and quitting the app, wait until that query finishes.
 - `DbClient` contract every implementation keeps:
   - Each client holds one driver connection, so a transaction can span calls.
   - `query` rows are arrays in `columns` order, so duplicate column names survive.
   - Integers that don't fit a JS number arrive as strings, never rounded (Postgres `int8` is always a string).
   - A statement that returns no rows gives empty `columns`/`rows` and its affected-row count.
   - Each client attaches an `'error'` listener, since an unhandled driver `'error'` event crashes the main process.
-- The renderer reaches the database only through typed methods on `window.api` (`ipcMain.handle` / `ipcRenderer.invoke`, channels like `db:query`). New features should not use the raw `window.electron.ipcRenderer`.
+- The renderer reaches the database only through `window.api`. New features should not use the raw `window.electron.ipcRenderer`. To add a method:
+  1. Declare it in `Api` in `src/shared/api.ts`.
+  2. Implement it in the group's `Handlers` object in `src/main/ipc.ts`, with the same signature plus a leading `IpcMainInvokeEvent`. `handle(group, handlers)` registers each method as channel `<group>:<method>`.
+  3. Map it in `src/preload/index.ts` to `invoke('<group>:<method>', …)`.
+- Handlers just throw on failure. `handle()` returns an `IpcResult` envelope, and preload rethrows it as a plain `Error` carrying only the message, since custom error properties don't survive `contextBridge`. So the renderer sees a clean `e.message`, without Electron's "Error invoking remote method" prefix.
+- `api.db.connect(config)` returns a UUID connection id. `ipc.ts` keeps open clients in a `Map` and closes a window's connections when that window closes or reloads.
+- `registerIpc()` in `src/main/ipc.ts` registers everything and is called from `src/main/index.ts`.
+
+### Planned architecture (agreed with the user, not built yet)
+
 - Saved connections in a SQLite file under `app.getPath('userData')`; passwords encrypted with `safeStorage`.
 - No router: `App` shows a connect screen or the workspace based on state, and open tabs live in a Zustand store. If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.
 - UI libraries (installed, not used yet): Zustand, AG Grid Community, CodeMirror 6 (`@uiw/react-codemirror`), Tailwind CSS v4. Tailwind is wired in through `@tailwindcss/vite` and `@import 'tailwindcss'` in `src/renderer/src/assets/main.css`; keep any other CSS inside `@layer`, since unlayered rules override Tailwind utilities.
