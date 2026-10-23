@@ -5,18 +5,14 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Open decisions (ask the user before acting)
 
-- **`nodeLinker: hoisted`** is not set in `pnpm-workspace.yaml`, so `node_modules` uses pnpm's isolated
-  layout. Recommended before adding `better-sqlite3` and before packaging; needs a fresh `pnpm install`.
-- **Electron download mirror**: `electron-builder.yml` has `electronDownload.mirror: https://npmmirror.com/mirrors/electron/`
-  (from the scaffolder). Recommended to remove unless the user wants the mirror.
-- **Git**: the project is not a git repository yet.
 - **License for Trowel** (GPLv3 vs MIT/closed): decides whether any Beekeeper Studio GPLv3 code may be ported.
 
 ## Steps
 
 - [x] **1. Prerequisites** — Node 24.22.1, pnpm 11.24.0.
 - [x] **2. Scaffold** — electron-vite `react-ts` template; `pnpm dev` opens the window.
-- [ ] **3. Dependencies**
+- [x] **3. Dependencies** — also set `nodeLinker: hoisted`, removed the Electron download mirror, and deleted
+  the template's `base.css` (its unlayered resets would override Tailwind's layered utilities).
   - Add `better-sqlite3: true` under `allowBuilds` in `pnpm-workspace.yaml` first.
   - Main process: `pnpm add pg mysql2 better-sqlite3` and `pnpm add -D @types/pg @types/better-sqlite3`.
   - Renderer: `pnpm add zustand ag-grid-community ag-grid-react @uiw/react-codemirror @codemirror/lang-sql @codemirror/lang-json`.

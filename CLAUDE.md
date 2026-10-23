@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The repo is currently the unmodified electron-vite `react-ts` template; none of the database features exist yet.
+Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The repo is still the electron-vite `react-ts` template plus the planned dependencies; none of the database features exist yet.
 
-Build progress, the remaining steps and open decisions are tracked in `PLAN.md`. Read it at the start of a session and tick its checkboxes as steps land.
+Build progress, the remaining steps and open decisions are tracked in `PLAN.md`. Read it at the start of a session and tick its checkboxes as steps land. The repo is a git repository on `main`: commit each step as it lands.
 
 ## Commands
 
@@ -43,18 +43,19 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, vite config) and `
 - The renderer reaches the database only through typed methods on `window.api` (`ipcMain.handle` / `ipcRenderer.invoke`, channels like `db:query`). New features should not use the raw `window.electron.ipcRenderer`.
 - Saved connections in a SQLite file under `app.getPath('userData')`; passwords encrypted with `safeStorage`.
 - No router: `App` shows a connect screen or the workspace based on state, and open tabs live in a Zustand store. If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.
-- Planned UI libraries: Zustand, AG Grid Community, CodeMirror 6 (`@uiw/react-codemirror`), Tailwind CSS v4.
+- UI libraries (installed, not used yet): Zustand, AG Grid Community, CodeMirror 6 (`@uiw/react-codemirror`), Tailwind CSS v4. Tailwind is wired in through `@tailwindcss/vite` and `@import 'tailwindcss'` in `src/renderer/src/assets/main.css`; keep any other CSS inside `@layer`, since unlayered rules override Tailwind utilities.
 
 ## pnpm and native modules
 
 - pnpm 11 only reads auth/registry settings from `.npmrc`; other pnpm settings go in `pnpm-workspace.yaml`.
+- `pnpm-workspace.yaml` sets `nodeLinker: hoisted` (flat `node_modules`, which electron-builder and native-module rebuilds expect). Changing it requires deleting `node_modules` and running `pnpm install` again.
 - Dependencies with install scripts must be listed under `allowBuilds` in `pnpm-workspace.yaml`, or `pnpm install` fails with `ERR_PNPM_IGNORED_BUILDS` (e.g. add `better-sqlite3: true` when adding it).
 - `postinstall` runs `install-electron` (downloads the Electron binary) and `electron-builder install-app-deps` (rebuilds native modules for Electron's Node ABI). `electron-builder.yml` sets `npmRebuild: false`, so packaging relies on that postinstall rebuild; on a `NODE_MODULE_VERSION` error run `pnpm exec electron-builder install-app-deps`.
-- Do not read `.npmrc`: a user hook blocks it because it can hold auth tokens.
+- Do not read `.npmrc`: a user hook blocks any Bash command that mentions it, because it can hold auth tokens. It is gitignored.
 
 ## Template placeholders still to replace
 
-`appId: com.electron.app` and `publish.url` (example.com) in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, `author`/`homepage` in `package.json`, the `<title>` in `src/renderer/index.html`, and the template's demo UI (`App.tsx`, `components/Versions.tsx`, the `ping` IPC handler).
+`appId: com.electron.app` and `publish.url` (example.com) in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, `author`/`homepage` in `package.json`, the `<title>` in `src/renderer/index.html`, and the template's demo UI (`App.tsx`, `components/Versions.tsx`, `assets/electron.svg`, the `ping` IPC handler). The demo's CSS is already gone, so it renders unstyled until step 8 replaces it.
 
 ## Beekeeper Studio reference and licensing
 
