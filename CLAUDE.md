@@ -35,7 +35,9 @@ electron-vite builds three targets from `electron.vite.config.ts`, output to `ou
 - `src/preload/` — runs before the page with `contextIsolation` on and `sandbox: false`. Exposes `window.electron` (the `@electron-toolkit/preload` wrapper, which can send on any IPC channel) and `window.api` (custom, currently empty). Types for both live in `src/preload/index.d.ts`, which `tsconfig.web.json` includes so the renderer sees them.
 - `src/renderer/` — the React app. `index.html` sets a strict Content-Security-Policy (`script-src 'self'`, no remote connections), so inline scripts and remote resources are blocked until the CSP is changed. `@renderer` aliases `src/renderer/src` (renderer only).
 
-Two TypeScript projects: `tsconfig.node.json` (main, preload, vite config) and `tsconfig.web.json` (renderer plus preload `.d.ts`). Code shared by main and renderer must be included in both and aliased in each relevant section of `electron.vite.config.ts`; no shared folder or alias exists yet.
+Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite config) and `tsconfig.web.json` (renderer, shared, preload `.d.ts`). Code used by both sides lives in `src/shared/` and is imported as `@shared/…` from main, preload and renderer. The alias is defined in all three sections of `electron.vite.config.ts` and in `paths` of both tsconfigs, so a new alias needs the same treatment. Both projects type-check `src/shared/`, so it must not use Node, Electron or DOM APIs.
+
+Main-process IPC handlers are registered in `src/main/ipc.ts` (`registerIpc()`, called from `index.ts`).
 
 ### Planned architecture (agreed with the user, not built yet)
 
@@ -55,7 +57,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, vite config) and `
 
 ## Template placeholders still to replace
 
-`appId: com.electron.app` and `publish.url` (example.com) in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, `author`/`homepage` in `package.json`, the `<title>` in `src/renderer/index.html`, and the template's demo UI (`App.tsx`, `components/Versions.tsx`, `assets/electron.svg`, the `ping` IPC handler). The demo's CSS is already gone, so it renders unstyled until step 8 replaces it.
+`appId: com.electron.app` and `publish.url` (example.com) in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, `author`/`homepage` in `package.json`, the `<title>` in `src/renderer/index.html`, and the template's demo UI (`App.tsx`, `components/Versions.tsx`, `assets/electron.svg`, the `ping` IPC handler in `src/main/ipc.ts`). The demo's CSS is already gone, so it renders unstyled until step 8 replaces it.
 
 ## Beekeeper Studio reference and licensing
 
