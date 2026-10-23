@@ -11,8 +11,21 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   SQLite, plus `multipleStatements` for mysql2. Decide before step 9.
 - **SSL/TLS** for Postgres and MySQL: not in `ServerConnectionConfig` yet. Most hosted databases (RDS, Neon,
   Supabase, PlanetScale) require it. Decide before step 8's form.
-- **SQLite blocks the main process**: `better-sqlite3` is synchronous, so a slow SQLite query freezes all IPC
-  until it ends. A worker thread would fix it. Fine for now; revisit if it hurts.
+- **SQLite blocks the main process** (decide before step 6, since option 2 changes the IPC layer):
+  `better-sqlite3` is synchronous, so a slow SQLite query blocks the main process until it ends. The window
+  stays drawn and React still responds, but every database call, native menu and file dialog waits, and
+  the query can't be cancelled.
+  - Beekeeper Studio, for comparison: uses the same driver and also runs SQLite queries synchronously, and its
+    SQLite `cancel()` doesn't interrupt a running query (`apps/studio/src/lib/db/clients/sqlite.ts`). But it runs
+    every database client in an Electron utility process that the renderer reaches over a `MessagePort`
+    (`src/lib/utility/UtilityConnection.ts`). So the main process, window and menus stay free, while other
+    database requests still queue behind the slow query.
+  - Option 1, worker thread for SQLite only: the smallest change, limited to `sqlite.ts`. Postgres and MySQL
+    aren't held up, and terminating the worker cancels the query.
+  - Option 2, utility process for all drivers (Beekeeper's approach): needs a separate entry point and a
+    `MessagePort` instead of `ipcMain.handle`. It also keeps a native driver crash from taking down the main
+    process.
+  - Option 3, keep it as is: fine for small SQLite files.
 
 ## Steps
 
