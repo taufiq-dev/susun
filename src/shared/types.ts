@@ -22,6 +22,18 @@ export interface SqliteConnectionConfig {
 
 export type ConnectionConfig = ServerConnectionConfig | SqliteConnectionConfig
 
+// A connection saved on the connect screen. Its password is stored encrypted and comes back
+// decrypted in `config`.
+export interface SavedConnection {
+  id: string
+  name: string
+  config: ConnectionConfig
+}
+
+// What `api.connections.save` takes: without an `id` it adds a connection, with one it replaces
+// that saved connection.
+export type SavedConnectionInput = Omit<SavedConnection, 'id'> & { id?: string }
+
 // `schema` is the Postgres schema. MySQL (one database per connection) and SQLite leave it unset.
 export interface TableRef {
   schema?: string

@@ -16,6 +16,11 @@ const api: Api = {
     listTables: (connectionId) => invoke('db:listTables', connectionId),
     listColumns: (connectionId, table) => invoke('db:listColumns', connectionId, table),
     query: (connectionId, sql, params) => invoke('db:query', connectionId, sql, params)
+  },
+  connections: {
+    list: () => invoke('connections:list'),
+    save: (connection) => invoke('connections:save', connection),
+    remove: (id) => invoke('connections:remove', id)
   }
 }
 

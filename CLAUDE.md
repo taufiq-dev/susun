@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The repo is still the electron-vite `react-ts` template plus the planned dependencies; none of the database features exist yet.
+Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The main-process side exists (database clients, saved connections, the `window.api` IPC); the UI is still the electron-vite `react-ts` template's demo.
 
 Build progress, the remaining steps and open decisions are tracked in `PLAN.md`. Read it at the start of a session and tick its checkboxes as steps land. The repo is a git repository on `main`: commit each step as it lands.
 
@@ -24,6 +24,8 @@ pnpm build:mac           # package with electron-builder into dist/ (also build:
 ```
 
 `build:mac` and `build:linux` skip the typecheck (they call `electron-vite build` directly); `build:win` and `build:unpack` go through `pnpm build`. There is no test runner yet.
+
+To run the built app without touching the real userData folder or the login keychain (e.g. when testing saved connections), use `node_modules/.bin/electron . --user-data-dir=<scratch dir> --use-mock-keychain`; add `--remote-debugging-port=9333` to drive `window.api` over the DevTools protocol.
 
 VS Code: the "Debug All" launch config debugs main and renderer together (renderer attaches on port 9222).
 
@@ -55,9 +57,15 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 - `api.db.connect(config)` returns a UUID connection id. `ipc.ts` keeps open clients in a `Map` and closes a window's connections when that window closes or reloads.
 - `registerIpc()` in `src/main/ipc.ts` registers everything and is called from `src/main/index.ts`.
 
+### Saved connections
+
+- `src/main/connections.ts`, exposed as `api.connections.list/save/remove`. They are stored configs, not open connections: the renderer passes a saved `config` to `api.db.connect`.
+- Stored in `trowel.db` in `app.getPath('userData')` (`~/Library/Application Support/trowel` on macOS), opened in the main process with `better-sqlite3`, which is fine for a table this small. Schema changes go in `MIGRATIONS`, tracked by `pragma user_version`: append a new entry, never edit one that has shipped.
+- The config is JSON without its password, so new config fields (e.g. SSL) need no migration. A new secret field would need encrypting like the password.
+- Passwords are in their own column, encrypted with the async `safeStorage` calls, and come back decrypted in `list()`: protected at rest, not hidden from the renderer. `save` throws if no system keychain is available, rather than store a password safeStorage can only obfuscate; a password that can't be decrypted lists as empty.
+
 ### Planned architecture (agreed with the user, not built yet)
 
-- Saved connections in a SQLite file under `app.getPath('userData')`; passwords encrypted with `safeStorage`.
 - No router: `App` shows a connect screen or the workspace based on state, and open tabs live in a Zustand store. If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.
 - UI libraries (installed, not used yet): Zustand, AG Grid Community, CodeMirror 6 (`@uiw/react-codemirror`), Tailwind CSS v4. Tailwind is wired in through `@tailwindcss/vite` and `@import 'tailwindcss'` in `src/renderer/src/assets/main.css`; keep any other CSS inside `@layer`, since unlayered rules override Tailwind utilities.
 

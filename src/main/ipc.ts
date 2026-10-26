@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron'
-import type { DbApi, IpcResult } from '@shared/api'
+import type { ConnectionsApi, DbApi, IpcResult } from '@shared/api'
+import { listConnections, removeConnection, saveConnection } from './connections'
 import { createClient, type DbClient } from './db'
 
 // The main-process side of an API group in @shared/api: the same methods, each also given the
@@ -16,19 +17,19 @@ interface OpenConnection {
   owner: WebContents
 }
 
-const connections = new Map<string, OpenConnection>()
+const openConnections = new Map<string, OpenConnection>()
 const watchedOwners = new WeakSet<WebContents>()
 
 function client(connectionId: string): DbClient {
-  const open = connections.get(connectionId)
+  const open = openConnections.get(connectionId)
   if (!open) throw new Error('Connection is closed')
   return open.client
 }
 
 function close(connectionId: string): Promise<void> {
-  const open = connections.get(connectionId)
+  const open = openConnections.get(connectionId)
   if (!open) return Promise.resolve()
-  connections.delete(connectionId)
+  openConnections.delete(connectionId)
   return open.client.disconnect()
 }
 
@@ -37,7 +38,7 @@ function watchOwner(owner: WebContents): void {
   if (watchedOwners.has(owner)) return
   watchedOwners.add(owner)
   const closeAll = (): void => {
-    for (const [id, open] of connections) {
+    for (const [id, open] of openConnections) {
       if (open.owner !== owner) continue
       close(id).catch((err) => console.error('disconnect failed:', err.message))
     }
@@ -51,7 +52,7 @@ const db: Handlers<DbApi> = {
     const client = createClient(config)
     await client.connect()
     const id = randomUUID()
-    connections.set(id, { client, owner: event.sender })
+    openConnections.set(id, { client, owner: event.sender })
     watchOwner(event.sender)
     return id
   },
@@ -59,6 +60,12 @@ const db: Handlers<DbApi> = {
   listTables: (_event, connectionId) => client(connectionId).listTables(),
   listColumns: (_event, connectionId, table) => client(connectionId).listColumns(table),
   query: (_event, connectionId, sql, params) => client(connectionId).query(sql, params)
+}
+
+const connections: Handlers<ConnectionsApi> = {
+  list: () => listConnections(),
+  save: (_event, connection) => saveConnection(connection),
+  remove: (_event, id) => removeConnection(id)
 }
 
 function handle<T>(group: string, handlers: Handlers<T>): void {
@@ -79,4 +86,5 @@ export function registerIpc(): void {
   ipcMain.on('ping', () => console.log('pong'))
 
   handle<DbApi>('db', db)
+  handle<ConnectionsApi>('connections', connections)
 }

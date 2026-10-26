@@ -56,12 +56,20 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   `window.api.db.*`, typed by `Api` in `src/shared/api.ts`. `connect` returns a UUID connection id, errors reach the
   renderer as plain `Error`s with the driver's message, and a window's connections close when it closes or
   reloads. Tested end to end in the built app over the DevTools protocol (Postgres 18, MariaDB 13, SQLite).
-- [ ] **7. Saved connections** — SQLite file under `app.getPath('userData')` via `better-sqlite3`; encrypt
-  passwords with `safeStorage.encryptString()`.
+- [x] **7. Saved connections** — SQLite file under `app.getPath('userData')` via `better-sqlite3`; encrypt
+  passwords with `safeStorage.encryptString()`. Done as `src/main/connections.ts` (`trowel.db`, one
+  `connections` table, `pragma user_version` migrations) and `api.connections.list/save/remove`. Uses the async
+  `safeStorage` calls instead, which don't block the main process during a keychain prompt and re-encrypt after
+  a key rotation. Passwords come back decrypted to the renderer. Tested end to end in the built app with a
+  scratch userData folder and the mock keychain: round trips, update, restart, a corrupted password, a saved
+  Postgres config connecting. Not tested against the real Keychain.
 - [ ] **8. App shell** — `App.tsx` renders `ConnectScreen` or `Workspace` from state. Connect screen: saved list +
   form (type, host, port, user, password, database; file path for SQLite) + Test and Connect. Workspace: tables
   left, tab bar + active tab centre, JSON viewer right. Tabs in a Zustand store `{ tabs, activeId }`, each tab
-  `{ type: 'query', sql }` or `{ type: 'table', table }`.
+  `{ type: 'query', sql }` or `{ type: 'table', table }`. Saved connections: `list()` gives each full config,
+  so the form edits it directly and Connect passes it to `api.db.connect`. Every non-empty password is saved; a
+  "don't save password" option would need a password prompt on connect (and is the only way to save at all on
+  Linux without a keyring, where `save` throws).
 - [ ] **9. Query tab** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor. Results in AG Grid
   with row count and run time; show database errors in place of the grid. Register AG Grid modules once in
   `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`. Rows arrive as arrays: give each
@@ -76,4 +84,6 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   string, dates → ISO strings. Postgres/MySQL JSON columns arrive parsed and show as nested objects.
 - [ ] **12. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
-  Developer account for signing and notarization.
+  Developer account for signing and notarization. Settle the app name (`trowel` now) before anyone relies on
+  saved connections: the userData folder and the keychain entry (`<name> Safe Storage`) are both named after it,
+  so a rename later loses saved connections or lists their passwords as empty.
