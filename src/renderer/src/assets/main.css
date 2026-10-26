@@ -1,1 +1,98 @@
 @import 'tailwindcss';
+
+/* Colours are CSS variables so they follow the OS theme. Each database type has its own colour,
+   and `data-db="<type>"` on an element makes it the accent (--accent) for everything inside, so
+   the workspace is tinted by the kind of database it is connected to. */
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-sunken: var(--sunken);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --color-on-accent: var(--on-accent);
+  --color-danger: var(--danger);
+  --color-ok: var(--ok);
+  --color-postgres: var(--postgres);
+  --color-mysql: var(--mysql);
+  --color-sqlite: var(--sqlite);
+}
+
+@theme {
+  --font-sans: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+@layer base {
+  :root {
+    color-scheme: light dark;
+    --canvas: #f4f4f6;
+    --surface: #ffffff;
+    --sunken: #ececef;
+    --line: #d9d9de;
+    --ink: #1c1d22;
+    --muted: #63666f;
+    --danger: #b3261e;
+    --ok: #2b7146;
+    --postgres: #2f6690;
+    --mysql: #94560a;
+    --sqlite: #3b7346;
+    --accent: #3d4049;
+    --on-accent: #ffffff;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --canvas: #1b1c20;
+      --surface: #222328;
+      --sunken: #18191c;
+      --line: #34363d;
+      --ink: #e4e5e9;
+      --muted: #9a9da6;
+      --danger: #f08b81;
+      --ok: #79c495;
+      --postgres: #82b1dc;
+      --mysql: #e2a54f;
+      --sqlite: #8cc597;
+      --accent: #c3c6ce;
+      --on-accent: #15161a;
+    }
+  }
+
+  [data-db='postgres'] {
+    --accent: var(--postgres);
+  }
+  [data-db='mysql'] {
+    --accent: var(--mysql);
+  }
+  [data-db='sqlite'] {
+    --accent: var(--sqlite);
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    overflow: hidden;
+    background: var(--canvas);
+    color: var(--ink);
+    font-size: 13px;
+    line-height: 1.4;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--accent) 30%, transparent);
+  }
+}
+
+@utility focus-ring {
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+  }
+}

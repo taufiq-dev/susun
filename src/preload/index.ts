@@ -21,6 +21,9 @@ const api: Api = {
     list: () => invoke('connections:list'),
     save: (connection) => invoke('connections:save', connection),
     remove: (id) => invoke('connections:remove', id)
+  },
+  dialog: {
+    openSqliteFile: () => invoke('dialog:openSqliteFile')
   }
 }
 

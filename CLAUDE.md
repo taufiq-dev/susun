@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The main-process side exists (database clients, saved connections, the `window.api` IPC); the UI is still the electron-vite `react-ts` template's demo.
+Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The main-process side (database clients, saved connections, the `window.api` IPC) and the app shell (connect screen, workspace layout, tabs) exist; the query editor, table grid and JSON viewer don't yet.
 
 Build progress, the remaining steps and open decisions are tracked in `PLAN.md`. Read it at the start of a session and tick its checkboxes as steps land. The repo is a git repository on `main`: commit each step as it lands.
 
@@ -54,7 +54,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
   1. Declare it in `Api` in `src/shared/api.ts`.
   2. Implement it in the group's `Handlers` object in `src/main/ipc.ts`, with the same signature plus a leading `IpcMainInvokeEvent`. `handle(group, handlers)` registers each method as channel `<group>:<method>`.
   3. Map it in `src/preload/index.ts` to `invoke('<group>:<method>', …)`.
-- Handlers just throw on failure. `handle()` returns an `IpcResult` envelope, and preload rethrows it as a plain `Error` carrying only the message, since custom error properties don't survive `contextBridge`. So the renderer sees a clean `e.message`, without Electron's "Error invoking remote method" prefix.
+- Handlers just throw on failure. `handle()` returns an `IpcResult` envelope, and preload rethrows it as a plain `Error` carrying only the message, since custom error properties don't survive `contextBridge`. So the renderer sees a clean `e.message`, without Electron's "Error invoking remote method" prefix. An `AggregateError` with an empty message (Node's, when connecting to `localhost` fails on both `::1` and `127.0.0.1`) is reported as its inner errors' messages.
 - `api.db.connect(config)` returns a UUID connection id. `ipc.ts` keeps open clients in a `Map` and closes a window's connections when that window closes or reloads.
 - `registerIpc()` in `src/main/ipc.ts` registers everything and is called from `src/main/index.ts`.
 
@@ -65,10 +65,15 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 - The config is JSON without its password, so new config fields (e.g. SSL) need no migration. A new secret field would need encrypting like the password.
 - Passwords are in their own column, encrypted with the async `safeStorage` calls, and come back decrypted in `list()`: protected at rest, not hidden from the renderer. `save` throws if no system keychain is available, rather than store a password safeStorage can only obfuscate; a password that can't be decrypted lists as empty.
 
-### Planned architecture (agreed with the user, not built yet)
+### Renderer
 
-- No router: `App` shows a connect screen or the workspace based on state, and open tabs live in a Zustand store. If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.
-- UI libraries (installed, not used yet): Zustand, AG Grid Community, CodeMirror 6 (`@uiw/react-codemirror`), Tailwind CSS v4. Tailwind is wired in through `@tailwindcss/vite` and `@import 'tailwindcss'` in `src/renderer/src/assets/main.css`; keep any other CSS inside `@layer`, since unlayered rules override Tailwind utilities.
+- No router: `App` shows `ConnectScreen` or `Workspace` depending on the Zustand session store (`store/session.ts`). Open tabs are in `store/tabs.ts` (`{ tabs, activeId }`, each tab `query` with its `sql` or `table` with its `TableRef`). If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.
+- Code is grouped by feature under `src/renderer/src/features/` (`connect`, `workspace`, `sidebar`, `query`, `table`, `json-viewer`); shared primitives (`Button`, `IconButton`, `TextInput`, `Field`, `Segmented`, `DbMark`) are in `components/ui.tsx`, icons in `components/icons.tsx`.
+- Styling is Tailwind CSS v4 (`@tailwindcss/vite`, `src/renderer/src/assets/main.css`). Keep any other CSS inside `@layer`, since unlayered rules override Tailwind utilities. Colours are CSS variables mapped to utilities (`bg-surface`, `text-muted`, `border-line`, `bg-accent`, ...) with light and dark values following the OS theme; use those rather than raw palette colours.
+- Each database type has a colour, and `data-db="<type>"` on an element makes it the `accent` inside: the workspace is tinted by its connection's type, the connect form by the selected type.
+- A `className` passed to a `components/ui.tsx` component should only add layout. Two utilities for the same property resolve by Tailwind's CSS order, not class order, so a caller can't reliably override the component's own padding, size or colour; add a prop instead (like `IconButton`'s `size`).
+- The `react-hooks` lint rules include `set-state-in-effect`: load data in an effect with `.then(...)` callbacks guarded by a `current` flag, and re-run it by bumping a counter in its dependencies (see `TableList`), rather than calling a state-setting function from the effect body.
+- Installed for later steps: AG Grid Community, CodeMirror 6 (`@uiw/react-codemirror`).
 
 ## pnpm and native modules
 
@@ -80,7 +85,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 
 ## Template placeholders still to replace
 
-`appId: com.electron.app` and `publish.url` (example.com) in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, `author`/`homepage` in `package.json`, the `<title>` in `src/renderer/index.html`, and the template's demo UI (`App.tsx`, `components/Versions.tsx`, `assets/electron.svg`, the `ping` IPC handler in `src/main/ipc.ts`). The demo's CSS is already gone, so it renders unstyled until step 8 replaces it.
+`appId: com.electron.app` and `publish.url` (example.com) in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, and `author`/`homepage` in `package.json`.
 
 ## Beekeeper Studio reference and licensing
 

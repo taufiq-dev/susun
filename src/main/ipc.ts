@@ -1,6 +1,13 @@
 import { randomUUID } from 'crypto'
-import { ipcMain, type IpcMainInvokeEvent, type WebContents } from 'electron'
-import type { ConnectionsApi, DbApi, IpcResult } from '@shared/api'
+import {
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  type IpcMainInvokeEvent,
+  type OpenDialogOptions,
+  type WebContents
+} from 'electron'
+import type { ConnectionsApi, DbApi, DialogApi, IpcResult } from '@shared/api'
 import { listConnections, removeConnection, saveConnection } from './connections'
 import { createClient, type DbClient } from './db'
 
@@ -68,6 +75,35 @@ const connections: Handlers<ConnectionsApi> = {
   remove: (_event, id) => removeConnection(id)
 }
 
+const SQLITE_FILE_DIALOG: OpenDialogOptions = {
+  title: 'Open SQLite database',
+  properties: ['openFile'],
+  filters: [
+    { name: 'SQLite databases', extensions: ['db', 'sqlite', 'sqlite3', 'db3'] },
+    { name: 'All files', extensions: ['*'] }
+  ]
+}
+
+const dialogs: Handlers<DialogApi> = {
+  async openSqliteFile(event) {
+    const window = BrowserWindow.fromWebContents(event.sender)
+    const { canceled, filePaths } = window
+      ? await dialog.showOpenDialog(window, SQLITE_FILE_DIALOG)
+      : await dialog.showOpenDialog(SQLITE_FILE_DIALOG)
+    return canceled ? null : (filePaths[0] ?? null)
+  }
+}
+
+// Connecting to "localhost" tries ::1 and 127.0.0.1, and if both fail Node throws an
+// AggregateError with an empty message; its inner errors say what happened.
+function errorMessage(err: unknown): string {
+  if (err instanceof AggregateError && !err.message) {
+    return err.errors.map(errorMessage).join('; ')
+  }
+  if (err instanceof Error) return err.message || err.name
+  return String(err)
+}
+
 function handle<T>(group: string, handlers: Handlers<T>): void {
   for (const [method, fn] of Object.entries(handlers)) {
     const handler = fn as (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
@@ -75,16 +111,14 @@ function handle<T>(group: string, handlers: Handlers<T>): void {
       try {
         return { ok: true, value: await handler(event, ...args) }
       } catch (err) {
-        return { ok: false, message: err instanceof Error ? err.message : String(err) }
+        return { ok: false, message: errorMessage(err) }
       }
     })
   }
 }
 
 export function registerIpc(): void {
-  // IPC test
-  ipcMain.on('ping', () => console.log('pong'))
-
   handle<DbApi>('db', db)
   handle<ConnectionsApi>('connections', connections)
+  handle<DialogApi>('dialog', dialogs)
 }

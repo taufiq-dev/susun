@@ -67,18 +67,27 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   a key rotation. Passwords come back decrypted to the renderer. Tested end to end in the built app with a
   scratch userData folder and the mock keychain: round trips, update, restart, a corrupted password, a saved
   Postgres config connecting. Not tested against the real Keychain.
-- [ ] **8. App shell** — `App.tsx` renders `ConnectScreen` or `Workspace` from state. Connect screen: saved list +
+- [x] **8. App shell** — `App.tsx` renders `ConnectScreen` or `Workspace` from state. Connect screen: saved list +
   form (type, host, port, user, password, database, SSL mode defaulting to Off; file path for SQLite) + Test and
   Connect. Label Require as not protecting against a man in the middle. Workspace: tables
   left, tab bar + active tab centre, JSON viewer right. Tabs in a Zustand store `{ tabs, activeId }`, each tab
   `{ type: 'query', sql }` or `{ type: 'table', table }`. Saved connections: `list()` gives each full config,
   so the form edits it directly and Connect passes it to `api.db.connect`. Every non-empty password is saved; a
   "don't save password" option would need a password prompt on connect (and is the only way to save at all on
-  Linux without a keyring, where `save` throws).
+  Linux without a keyring, where `save` throws). Done. Also: `api.dialog.openSqliteFile()` for the file picker,
+  double-click on a saved connection connects, a two-click delete, and per-database-type accent colours (see
+  CLAUDE.md). The query tab is a plain text area and the table tab lists the table's columns, until steps 9
+  and 10; the row panel is a placeholder (step 11) that the header button hides. Replaced the template's demo UI
+  and `ping` handler; the window is now 1280x800 (min 960x600). Tested by driving the built app over the
+  DevTools protocol, with screenshots in light and dark; the native file picker is untested.
+  Not done: resizable panes, keyboard shortcuts for tabs (Cmd+W would need a custom app menu, since the default
+  menu closes the window), and noticing a dropped connection.
 - [ ] **9. Query tab** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor. Results in AG Grid
   with row count and run time; show database errors in place of the grid. Register AG Grid modules once in
   `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`. Rows arrive as arrays: give each
-  grid column the index as its `field` (or a `valueGetter`), not the column name, which may repeat.
+  grid column the index as its `field` (or a `valueGetter`), not the column name, which may repeat. Only the
+  active tab is mounted, so keep each tab's last result in the tabs store (or keep tabs mounted), or switching
+  tabs throws it away.
 - [ ] **10. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a

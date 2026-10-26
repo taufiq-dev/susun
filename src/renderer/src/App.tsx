@@ -1,35 +1,17 @@
-import Versions from './components/Versions'
-import electronLogo from './assets/electron.svg'
+import { useEffect } from 'react'
+import { ConnectScreen } from './features/connect/ConnectScreen'
+import { Workspace } from './features/workspace/Workspace'
+import { useSession } from './store/session'
 
 function App(): React.JSX.Element {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
+  const session = useSession((s) => s.session)
 
-  return (
-    <>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        Build an Electron app with <span className="react">React</span>
-        &nbsp;and <span className="ts">TypeScript</span>
-      </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
-      </div>
-      <Versions></Versions>
-    </>
-  )
+  useEffect(() => {
+    document.title = session ? `${session.name} — Trowel` : 'Trowel'
+  }, [session])
+
+  // Keyed by connection so a new connection starts with fresh workspace state.
+  return session ? <Workspace key={session.connectionId} session={session} /> : <ConnectScreen />
 }
 
 export default App

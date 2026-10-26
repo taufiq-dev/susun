@@ -13,6 +13,7 @@ import type {
 export interface Api {
   db: DbApi
   connections: ConnectionsApi
+  dialog: DialogApi
 }
 
 export interface DbApi {
@@ -32,6 +33,11 @@ export interface ConnectionsApi {
   save(connection: SavedConnectionInput): Promise<SavedConnection>
   // Does nothing if no saved connection has that id.
   remove(id: string): Promise<void>
+}
+
+export interface DialogApi {
+  // Asks the user to pick a SQLite database file. Resolves to its path, or null if cancelled.
+  openSqliteFile(): Promise<string | null>
 }
 
 // How a handler's outcome crosses IPC. An error thrown in a handler would reach the renderer
