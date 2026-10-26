@@ -5,6 +5,13 @@ export const DB_TYPES = ['postgres', 'mysql', 'sqlite'] as const
 
 export type DbType = (typeof DB_TYPES)[number]
 
+// TLS for Postgres and MySQL. 'require' encrypts but accepts any certificate (Postgres's
+// sslmode=require); 'verify' also checks the certificate chain against the trusted CAs and the
+// host name against the certificate (sslmode=verify-full).
+export const SSL_MODES = ['off', 'require', 'verify'] as const
+
+export type SslMode = (typeof SSL_MODES)[number]
+
 export interface ServerConnectionConfig {
   type: 'postgres' | 'mysql'
   host: string
@@ -13,6 +20,7 @@ export interface ServerConnectionConfig {
   password: string
   // Empty means the server default: the user's own database on Postgres, none on MySQL.
   database: string
+  ssl: SslMode
 }
 
 export interface SqliteConnectionConfig {

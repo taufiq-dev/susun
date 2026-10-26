@@ -1,3 +1,4 @@
+import { isIP } from 'net'
 import { createConnection, type Connection, type RowDataPacket } from 'mysql2/promise'
 import type {
   ColumnInfo,
@@ -7,6 +8,7 @@ import type {
   TableRef
 } from '@shared/types'
 import type { DbClient } from './client'
+import { tlsOptions, withoutNodeHint } from './tls'
 
 const LIST_TABLES = `
   select table_name as name, table_type as type
@@ -33,16 +35,27 @@ export class MysqlClient implements DbClient {
   }
 
   async connect(): Promise<void> {
+    // For an IP address mysql2 leaves out the TLS server name, so Node checks the certificate
+    // against "localhost" instead of that address (mysql2 3.24.6). Refuse rather than check the
+    // wrong name.
+    if (this.config.ssl === 'verify' && isIP(this.config.host)) {
+      throw new Error("MySQL's SSL Verify mode needs the server's host name, not an IP address")
+    }
+    const tls = tlsOptions(this.config.ssl)
     this.conn = await createConnection({
       host: this.config.host,
       port: this.config.port,
       user: this.config.user,
       password: this.config.password,
       database: this.config.database || undefined,
+      // mysql2 checks the certificate's host name only when asked to.
+      ssl: tls && { ...tls, verifyIdentity: tls.rejectUnauthorized },
       connectTimeout: 10_000,
       // BIGINT and DECIMAL values that don't fit a JS number arrive as strings instead of being
       // rounded, so they display correctly and still match in a WHERE clause.
       supportBigNumbers: true
+    }).catch((err) => {
+      throw withoutNodeHint(err)
     })
     // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
     // queries reject with their own error.

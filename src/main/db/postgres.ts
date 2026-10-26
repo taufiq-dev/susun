@@ -7,6 +7,7 @@ import type {
   TableRef
 } from '@shared/types'
 import type { DbClient } from './client'
+import { tlsOptions, withoutNodeHint } from './tls'
 
 // relkind: r table, p partitioned table, f foreign table, v view, m materialized view.
 // Partitions are left out, since they can number in the thousands.
@@ -46,6 +47,8 @@ export class PostgresClient implements DbClient {
       user: config.user,
       password: config.password,
       database: config.database || undefined,
+      // Explicitly false when off: left undefined, pg would read PGSSLMODE from the environment.
+      ssl: tlsOptions(config.ssl) ?? false,
       connectionTimeoutMillis: 10_000
     })
     // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
@@ -54,7 +57,9 @@ export class PostgresClient implements DbClient {
   }
 
   async connect(): Promise<void> {
-    await this.client.connect()
+    await this.client.connect().catch((err) => {
+      throw withoutNodeHint(err)
+    })
   }
 
   async disconnect(): Promise<void> {

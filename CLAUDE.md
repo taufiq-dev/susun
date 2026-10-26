@@ -49,6 +49,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
   - Integers that don't fit a JS number arrive as strings, never rounded (Postgres `int8` is always a string).
   - A statement that returns no rows gives empty `columns`/`rows` and its affected-row count.
   - Each client attaches an `'error'` listener, since an unhandled driver `'error'` event crashes the main process.
+- TLS: `tlsOptions(config.ssl)` in `src/main/db/tls.ts` gives both server clients their TLS options. `verify` passes an explicit `ca` list (Node's default list plus the OS store), since a `ca` option replaces Node's list rather than adding to it. Driver quirks it works around: pg reads `PGSSLMODE` unless `ssl` is set (so off is an explicit `false`); mysql2 checks the host name only with `verifyIdentity`, and not at all correctly for an IP host (so MySQL refuses `verify` with one). Connect errors go through `withoutNodeHint`, which drops Node's inapplicable `--use-system-ca` advice.
 - The renderer reaches the database only through `window.api`. New features should not use the raw `window.electron.ipcRenderer`. To add a method:
   1. Declare it in `Api` in `src/shared/api.ts`.
   2. Implement it in the group's `Handlers` object in `src/main/ipc.ts`, with the same signature plus a leading `IpcMainInvokeEvent`. `handle(group, handlers)` registers each method as channel `<group>:<method>`.

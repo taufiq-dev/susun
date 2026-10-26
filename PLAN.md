@@ -9,8 +9,6 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 - **Multi-statement scripts**: `query` returns one result. Postgres runs a multi-statement script (no params)
   and returns the last result; MySQL and SQLite reject it. A result per statement would need SQL splitting for
   SQLite, plus `multipleStatements` for mysql2. Decide before step 9.
-- **SSL/TLS** for Postgres and MySQL: not in `ServerConnectionConfig` yet. Most hosted databases (RDS, Neon,
-  Supabase, PlanetScale) require it. Decide before step 8's form.
 - **Cancelling SQLite queries** (decide before step 9 if it needs a cancel button): `better-sqlite3` has no
   interrupt, and `worker.terminate()` waits for the running native call. So a SQLite query can't be stopped,
   and quitting the app during one waits for it to finish (measured: an 8.4 s wait). Fix if needed: run each SQLite
@@ -26,6 +24,12 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   query: Postgres answered in 3–7 ms, and a second SQLite connection in 3 ms. It doesn't make queries
   cancellable (see the open decision above). Beekeeper Studio has the same limit: its SQLite `cancel()` doesn't
   interrupt a running query.
+- **SSL: `ssl: 'off' | 'require' | 'verify'`** on Postgres/MySQL configs (`src/main/db/tls.ts`). Require encrypts
+  but accepts any certificate, so it doesn't stop a man in the middle; Verify checks the chain against Node's
+  bundled CAs plus the OS store, and the host name. MySQL refuses Verify with an IP host, because mysql2 checks
+  the certificate against "localhost" there. A CA certificate file field (for RDS without installing its CA)
+  can come later. Tested against Postgres 18 and MariaDB 13 with a test CA, untrusted and then trusted through
+  `NODE_EXTRA_CA_CERTS`; a CA installed in the macOS keychain is untested.
 
 ## Steps
 
@@ -64,7 +68,8 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   scratch userData folder and the mock keychain: round trips, update, restart, a corrupted password, a saved
   Postgres config connecting. Not tested against the real Keychain.
 - [ ] **8. App shell** — `App.tsx` renders `ConnectScreen` or `Workspace` from state. Connect screen: saved list +
-  form (type, host, port, user, password, database; file path for SQLite) + Test and Connect. Workspace: tables
+  form (type, host, port, user, password, database, SSL mode defaulting to Off; file path for SQLite) + Test and
+  Connect. Label Require as not protecting against a man in the middle. Workspace: tables
   left, tab bar + active tab centre, JSON viewer right. Tabs in a Zustand store `{ tabs, activeId }`, each tab
   `{ type: 'query', sql }` or `{ type: 'table', table }`. Saved connections: `list()` gives each full config,
   so the form edits it directly and Connect passes it to `api.db.connect`. Every non-empty password is saved; a
