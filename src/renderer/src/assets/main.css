@@ -38,6 +38,8 @@
     --postgres: #2f6690;
     --mysql: #94560a;
     --sqlite: #3b7346;
+    --syntax-string: #a3335f;
+    --syntax-number: #6a4bb3;
     --accent: #3d4049;
     --on-accent: #ffffff;
   }
@@ -55,6 +57,8 @@
       --postgres: #82b1dc;
       --mysql: #e2a54f;
       --sqlite: #8cc597;
+      --syntax-string: #e88fb2;
+      --syntax-number: #b6a2ef;
       --accent: #c3c6ce;
       --on-accent: #15161a;
     }
@@ -88,6 +92,20 @@
   ::selection {
     background: color-mix(in srgb, var(--accent) 30%, transparent);
   }
+}
+
+@layer components {
+  /* A NULL in a result grid, told apart from the text 'NULL'. */
+  .cell-null {
+    color: var(--muted);
+    font-style: italic;
+  }
+}
+
+/* AG Grid gives its cells subpixel font smoothing, which on macOS makes light-on-dark text look
+   bold next to the rest of the app. Unlayered, because the grid's own styles are. */
+.ag-root-wrapper .ag-cell {
+  -webkit-font-smoothing: antialiased;
 }
 
 @utility focus-ring {

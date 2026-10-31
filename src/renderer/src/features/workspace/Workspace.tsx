@@ -41,7 +41,14 @@ export function Workspace({ session }: { session: Session }): React.JSX.Element 
         <main className="flex min-w-0 flex-1 flex-col bg-surface">
           <TabBar />
           <div className="min-h-0 flex-1">
-            {active?.type === 'query' && <QueryTab key={active.id} tab={active} />}
+            {active?.type === 'query' && (
+              <QueryTab
+                key={active.id}
+                tab={active}
+                connectionId={session.connectionId}
+                dbType={session.type}
+              />
+            )}
             {active?.type === 'table' && (
               <TableTab key={active.id} tab={active} connectionId={session.connectionId} />
             )}

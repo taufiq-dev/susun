@@ -6,24 +6,26 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 ## Open decisions (ask the user before acting)
 
 - **License for Trowel** (GPLv3 vs MIT/closed): decides whether any Beekeeper Studio GPLv3 code may be ported.
-- **Multi-statement scripts**: `query` returns one result. Postgres runs a multi-statement script (no params)
-  and returns the last result; MySQL and SQLite reject it. A result per statement would need SQL splitting for
-  SQLite, plus `multipleStatements` for mysql2. Decide before step 9.
-- **Cancelling SQLite queries** (decide before step 9 if it needs a cancel button): `better-sqlite3` has no
-  interrupt, and `worker.terminate()` waits for the running native call. So a SQLite query can't be stopped,
-  and quitting the app during one waits for it to finish (measured: an 8.4 s wait). Fix if needed: run each SQLite
-  connection in an Electron `utilityProcess` instead of a worker thread. Killing a process is immediate and
-  SQLite's journal makes it safe, so that gives a real cancel and an instant quit, still only inside
-  `sqlite.ts`/`sqlite.worker.ts`. Postgres cancel (`pg_cancel_backend`) and MySQL cancel (`KILL QUERY`) would
-  each need a second connection.
 
 ## Decided
 
+- **Scripts: one result per statement, split by Trowel.** The editor's SQL is split into statements and they
+  run one at a time on the connection, stopping at the first error, as psql, the mysql client and sqlite3 do:
+  each commits on its own unless the script has its own BEGIN/COMMIT, and statements before an error keep
+  their effect. No mysql2 `multipleStatements`. The splitter is our own, in `src/shared/`, following each
+  database's lexical rules. sql-query-identifier 3.2.0 (MIT) was tried and rejected: it splits inside MySQL
+  strings with a backslash-escaped quote (`'it\'s'`, MySQL's default escaping), Postgres `E'…'` strings and
+  nested comments, and SQLite `[bracketed]` names, and it passes `DELIMITER` lines through as statements.
+- **Cancel for all three databases.** SQLite moves from a worker thread to an Electron `utilityProcess` per
+  connection, because `better-sqlite3` has no interrupt and `worker.terminate()` waits for the running native
+  call (so today a SQLite query can't be stopped, and quitting waits for it: measured 8.4 s). Cancelling kills
+  the process and reopens the file, which rolls back an open transaction and loses temp tables, attached
+  databases and PRAGMA settings; the UI says so. Postgres (`pg_cancel_backend`) and MySQL (`KILL QUERY`) cancel
+  from a short-lived second connection and stop only the running statement.
 - **SQLite off the main process: worker thread per connection** (option 1 of three; the others were a
   utility process for all drivers as Beekeeper Studio does, or leaving it). Measured during a 9.8 s SQLite
   query: Postgres answered in 3–7 ms, and a second SQLite connection in 3 ms. It doesn't make queries
-  cancellable (see the open decision above). Beekeeper Studio has the same limit: its SQLite `cancel()` doesn't
-  interrupt a running query.
+  cancellable, so step 9c replaces the worker with a utility process per connection (see above).
 - **SSL: `ssl: 'off' | 'require' | 'verify'`** on Postgres/MySQL configs (`src/main/db/tls.ts`). Require encrypts
   but accepts any certificate, so it doesn't stop a man in the middle; Verify checks the chain against Node's
   bundled CAs plus the OS store, and the host name. MySQL refuses Verify with an IP host, because mysql2 checks
@@ -82,12 +84,26 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   DevTools protocol, with screenshots in light and dark; the native file picker is untested.
   Not done: resizable panes, keyboard shortcuts for tabs (Cmd+W would need a custom app menu, since the default
   menu closes the window), and noticing a dropped connection.
-- [ ] **9. Query tab** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor. Results in AG Grid
-  with row count and run time; show database errors in place of the grid. Register AG Grid modules once in
-  `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`. Rows arrive as arrays: give each
-  grid column the index as its `field` (or a `valueGetter`), not the column name, which may repeat. Only the
-  active tab is mounted, so keep each tab's last result in the tabs store (or keep tabs mounted), or switching
-  tabs throws it away.
+- [ ] **9. Query tab** — in three parts, each committed on its own.
+  - [x] **9a. Editor and results** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor.
+    Results in AG Grid with row count and run time; show database errors in place of the grid. Register AG
+    Grid modules once in `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`. Rows arrive
+    as arrays: give each grid column the index as its `field` (or a `valueGetter`), not the column name, which
+    may repeat. Only the active tab is mounted, so keep each tab's last result in the tabs store (or keep tabs
+    mounted), or switching tabs throws it away. Done: `QueryTab` (editor, a bar with Run and
+    the run's status, results) with a draggable, keyboard-resizable split; `ResultGrid` shows NULL in muted
+    italics (unlike the text 'NULL'), binary as hex (first 32 bytes) and JSON as text, and sizes columns to
+    their contents up to 360 px. Dates and times now arrive as strings as the database formats them (see
+    CLAUDE.md). Tested in the built app against Postgres 18, MariaDB 13 and SQLite. Not done: completing
+    table and column names (the editor completes keywords only), and a row limit: a query returns all its
+    rows, so `select *` on a huge table loads every row into memory.
+  - [ ] **9b. Scripts** — the splitter in `src/shared/` (quotes, comments and identifiers per database,
+    Postgres dollar quoting, MySQL `DELIMITER`, trigger and procedure bodies), with Vitest as the test runner.
+    A result tab per statement that returns rows, a one-line summary for the rest, and an error that names
+    the failing statement and its line.
+  - [ ] **9c. Cancel** — first check that killing a utility process is immediate while it is inside a
+    long native SQLite call (the 10-second query test). Then SQLite in a `utilityProcess`, and
+    `api.db.cancel(connectionId)` for all three; Cancel also stops a script.
 - [ ] **10. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a

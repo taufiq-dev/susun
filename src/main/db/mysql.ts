@@ -53,7 +53,10 @@ export class MysqlClient implements DbClient {
       connectTimeout: 10_000,
       // BIGINT and DECIMAL values that don't fit a JS number arrive as strings instead of being
       // rounded, so they display correctly and still match in a WHERE clause.
-      supportBigNumbers: true
+      supportBigNumbers: true,
+      // Dates and times arrive as text, as the server formats them, rather than as JS Dates read
+      // in this computer's time zone.
+      dateStrings: true
     }).catch((err) => {
       throw withoutNodeHint(err)
     })

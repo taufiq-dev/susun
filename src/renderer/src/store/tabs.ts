@@ -1,11 +1,18 @@
 import { create } from 'zustand'
-import type { TableRef } from '@shared/types'
+import type { QueryResult, TableRef } from '@shared/types'
+
+// The latest run of a query tab. It lives here rather than in the tab's component, which unmounts
+// when another tab is activated. `id` is new for each run.
+export type QueryRun = { id: number } & (
+  { state: 'running' } | { state: 'done'; result: QueryResult } | { state: 'failed'; error: string }
+)
 
 export interface QueryTabState {
   id: string
   type: 'query'
   title: string
   sql: string
+  run?: QueryRun
 }
 
 export interface TableTabState {
@@ -28,6 +35,8 @@ interface TabsState {
   activate(id: string): void
   close(id: string): void
   setSql(id: string, sql: string): void
+  // Does nothing if the tab has been closed.
+  setRun(id: string, run: QueryRun): void
   reset(): void
 }
 
@@ -76,6 +85,11 @@ export const useTabs = create<TabsState>()((set) => ({
   setSql: (id, sql) =>
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? { ...t, sql } : t))
+    })),
+
+  setRun: (id, run) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? { ...t, run } : t))
     })),
 
   reset: () => set({ tabs: [], activeId: null, queryCount: 0 })

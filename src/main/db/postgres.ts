@@ -1,4 +1,4 @@
-import { Client, type QueryArrayResult } from 'pg'
+import { Client, types, type CustomTypesConfig, type QueryArrayResult } from 'pg'
 import type {
   ColumnInfo,
   QueryResult,
@@ -37,6 +37,24 @@ const LIST_COLUMNS = `
     and a.attnum > 0 and not a.attisdropped
   order by a.attnum`
 
+// Dates and times arrive as text, as the server formats them. As JS Dates they would lose
+// microseconds, and a `timestamp` (without time zone) would be read in this computer's time zone.
+// Intervals and geometric types stay text too, instead of becoming objects. The OIDs are date,
+// timestamp, timestamptz, interval, point and circle, then the arrays of the first five.
+const AS_TEXT = new Set([1082, 1114, 1184, 1186, 600, 718])
+const AS_TEXT_ARRAY = new Set([1182, 1115, 1185, 1187, 1017])
+type TypeId = Parameters<typeof types.getTypeParser>[0]
+// pg-types' TypeId enum lists only element types, not arrays.
+const parseTextArray: (value: string) => unknown = types.getTypeParser(1009 as TypeId) // text[]
+
+const TYPES: CustomTypesConfig = {
+  getTypeParser: (oid, format) => {
+    if (AS_TEXT.has(oid)) return (value: string) => value
+    if (AS_TEXT_ARRAY.has(oid)) return parseTextArray
+    return types.getTypeParser(oid, format)
+  }
+}
+
 export class PostgresClient implements DbClient {
   private client: Client
 
@@ -49,7 +67,9 @@ export class PostgresClient implements DbClient {
       database: config.database || undefined,
       // Explicitly false when off: left undefined, pg would read PGSSLMODE from the environment.
       ssl: tlsOptions(config.ssl) ?? false,
-      connectionTimeoutMillis: 10_000
+      connectionTimeoutMillis: 10_000,
+      application_name: 'Trowel',
+      types: TYPES
     })
     // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
     // queries reject with their own error.

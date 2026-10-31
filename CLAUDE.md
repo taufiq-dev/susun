@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The main-process side (database clients, saved connections, the `window.api` IPC) and the app shell (connect screen, workspace layout, tabs) exist; the query editor, table grid and JSON viewer don't yet.
+Trowel is a desktop database GUI (SQL editor, table browser, JSON row viewer) built with Electron, React 19, TypeScript and Vite via electron-vite. It is a from-scratch rewrite inspired by Beekeeper Studio. The main-process side (database clients, saved connections, the `window.api` IPC), the app shell (connect screen, workspace layout, tabs) and the query tab exist; the table grid and JSON viewer don't yet.
 
 Build progress, the remaining steps and open decisions are tracked in `PLAN.md`. Read it at the start of a session and tick its checkboxes as steps land. The repo is a git repository on `main`: commit each step as it lands.
 
@@ -47,6 +47,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
   - Each client holds one driver connection, so a transaction can span calls.
   - `query` rows are arrays in `columns` order, so duplicate column names survive.
   - Integers that don't fit a JS number arrive as strings, never rounded (Postgres `int8` is always a string).
+  - Dates and times arrive as strings, as the database formats them, never as JS `Date`s (which would drop microseconds and read a Postgres `timestamp` in the local time zone): pg type parsers in `postgres.ts` (which also keep intervals and geometric types as text), mysql2 `dateStrings`. SQLite has no date type.
   - A statement that returns no rows gives empty `columns`/`rows` and its affected-row count.
   - Each client attaches an `'error'` listener, since an unhandled driver `'error'` event crashes the main process.
 - TLS: `tlsOptions(config.ssl)` in `src/main/db/tls.ts` gives both server clients their TLS options. `verify` passes an explicit `ca` list (Node's default list plus the OS store), since a `ca` option replaces Node's list rather than adding to it. Driver quirks it works around: pg reads `PGSSLMODE` unless `ssl` is set (so off is an explicit `false`); mysql2 checks the host name only with `verifyIdentity`, and not at all correctly for an IP host (so MySQL refuses `verify` with one). Connect errors go through `withoutNodeHint`, which drops Node's inapplicable `--use-system-ca` advice.
@@ -67,13 +68,14 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 
 ### Renderer
 
-- No router: `App` shows `ConnectScreen` or `Workspace` depending on the Zustand session store (`store/session.ts`). Open tabs are in `store/tabs.ts` (`{ tabs, activeId }`, each tab `query` with its `sql` or `table` with its `TableRef`). If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.
+- No router: `App` shows `ConnectScreen` or `Workspace` depending on the Zustand session store (`store/session.ts`). Open tabs are in `store/tabs.ts` (`{ tabs, activeId }`, each tab `query` with its `sql` and latest `run`, or `table` with its `TableRef`). Only the active tab is mounted, so anything a tab must keep (like a query's result) belongs in the store; `features/query/run.ts` writes a run's outcome there, so it lands even if the tab was switched away. `store/layout.ts` holds pane sizes shared by tabs. If a router is ever added, use `HashRouter` or `MemoryRouter`, since the packaged app loads from `file://`.
 - Code is grouped by feature under `src/renderer/src/features/` (`connect`, `workspace`, `sidebar`, `query`, `table`, `json-viewer`); shared primitives (`Button`, `IconButton`, `TextInput`, `Field`, `Segmented`, `DbMark`) are in `components/ui.tsx`, icons in `components/icons.tsx`.
 - Styling is Tailwind CSS v4 (`@tailwindcss/vite`, `src/renderer/src/assets/main.css`). Keep any other CSS inside `@layer`, since unlayered rules override Tailwind utilities. Colours are CSS variables mapped to utilities (`bg-surface`, `text-muted`, `border-line`, `bg-accent`, ...) with light and dark values following the OS theme; use those rather than raw palette colours.
 - Each database type has a colour, and `data-db="<type>"` on an element makes it the `accent` inside: the workspace is tinted by its connection's type, the connect form by the selected type.
 - A `className` passed to a `components/ui.tsx` component should only add layout. Two utilities for the same property resolve by Tailwind's CSS order, not class order, so a caller can't reliably override the component's own padding, size or colour; add a prop instead (like `IconButton`'s `size`).
 - The `react-hooks` lint rules include `set-state-in-effect`: load data in an effect with `.then(...)` callbacks guarded by a `current` flag, and re-run it by bumping a counter in its dependencies (see `TableList`), rather than calling a state-setting function from the effect body.
-- Installed for later steps: AG Grid Community, CodeMirror 6 (`@uiw/react-codemirror`).
+- Query results use `components/ResultGrid.tsx` (AG Grid Community; modules registered once in `main.tsx`). Rows are arrays, so each column reads its value by index. The editor is CodeMirror 6 through `@uiw/react-codemirror`, set up in `features/query/editor.ts`. Both are themed with the app's CSS variables (AG Grid `themeQuartz.withParams`, CodeMirror `EditorView.theme`), so they follow the OS theme and the accent with no reconfiguring.
+- One exception to keeping CSS in `@layer`: overrides of AG Grid's own rules, which are unlayered, so a layered rule would lose to them.
 
 ## pnpm and native modules
 
