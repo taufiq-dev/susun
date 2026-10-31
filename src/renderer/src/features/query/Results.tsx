@@ -39,9 +39,25 @@ export function RunStatus({ run }: { run?: QueryRun }): React.JSX.Element | null
   if (!run) return null
   const done = run.statements.length
   if (run.state === 'running') {
+    if (run.cancelling) return <span className="text-muted">Cancelling…</span>
     return (
       <span className="text-muted">
         {run.total === 1 ? 'Running…' : `Running statement ${done + 1} of ${run.total}…`}
+        {run.cancelError && (
+          <span className="text-danger"> Couldn’t cancel: {run.cancelError}</span>
+        )}
+      </span>
+    )
+  }
+  if (run.state === 'cancelled') {
+    const last = run.statements[done - 1]
+    return (
+      <span className="text-muted">
+        {run.total === 1
+          ? 'Cancelled'
+          : last && 'error' in last
+            ? `Statement ${done} of ${run.total} cancelled`
+            : `Cancelled after statement ${done} of ${run.total}`}
       </span>
     )
   }
@@ -106,8 +122,14 @@ function SingleResult({ run }: { run: QueryRun }): React.JSX.Element {
   if ('error' in s) {
     return (
       <div className="h-full overflow-auto px-4 py-3">
-        <p className="mb-1 font-medium text-danger">The query failed</p>
-        <pre className="font-mono text-[12px] whitespace-pre-wrap text-ink select-text">
+        {s.cancelled ? (
+          <p className="mb-1 font-medium">The query was cancelled</p>
+        ) : (
+          <p className="mb-1 font-medium text-danger">The query failed</p>
+        )}
+        <pre
+          className={`font-mono text-[12px] whitespace-pre-wrap select-text ${s.cancelled ? 'text-muted' : 'text-ink'}`}
+        >
           {s.error}
         </pre>
       </div>
@@ -216,7 +238,12 @@ function StatementList({
   onShowStatement: (from: number, to: number) => void
 }): React.JSX.Element {
   const hidden = Math.max(0, run.statements.length - LISTED_STATEMENTS)
-  const notRun = run.state === 'failed' ? run.total - run.statements.length : 0
+  const stopped = run.state === 'failed' || run.state === 'cancelled'
+  const notRun = stopped ? run.total - run.statements.length : 0
+  const last = run.statements[run.statements.length - 1]
+  // Whether the run stopped at a statement (an error, or cancelled mid-statement) rather than
+  // between two.
+  const afterIt = last !== undefined && 'error' in last
 
   return (
     <div className="h-full overflow-auto text-[12px]">
@@ -253,7 +280,9 @@ function StatementList({
                   </td>
                   <td className="py-1 pr-3 whitespace-nowrap">
                     {'error' in s ? (
-                      <span className="text-danger">Failed</span>
+                      <span className={s.cancelled ? 'text-muted' : 'text-danger'}>
+                        {s.cancelled ? 'Cancelled' : 'Failed'}
+                      </span>
                     ) : s.result.columns.length > 0 ? (
                       <button type="button" onClick={() => onView(index)} className={LINK}>
                         {outcome(s.result)}
@@ -270,7 +299,9 @@ function StatementList({
                   <tr>
                     <td />
                     <td colSpan={3} className="pr-3 pb-2">
-                      <pre className="font-mono whitespace-pre-wrap text-danger select-text">
+                      <pre
+                        className={`font-mono whitespace-pre-wrap select-text ${s.cancelled ? 'text-muted' : 'text-danger'}`}
+                      >
                         {s.error}
                       </pre>
                     </td>
@@ -289,8 +320,10 @@ function StatementList({
       {notRun > 0 && (
         <p className="border-t border-line px-3 py-1.5 text-muted">
           {notRun === 1
-            ? 'The statement after it didn’t run.'
-            : `The ${notRun.toLocaleString()} statements after it didn’t run.`}
+            ? `The ${afterIt ? 'statement after it' : 'last statement'} didn’t run.`
+            : afterIt
+              ? `The ${notRun.toLocaleString()} statements after it didn’t run.`
+              : `The last ${notRun.toLocaleString()} statements didn’t run.`}
         </p>
       )}
     </div>

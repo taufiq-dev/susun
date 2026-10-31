@@ -1,4 +1,4 @@
-import { Client, types, type CustomTypesConfig, type QueryArrayResult } from 'pg'
+import { Client, types, type ClientConfig, type CustomTypesConfig, type QueryArrayResult } from 'pg'
 import type {
   ColumnInfo,
   QueryResult,
@@ -55,39 +55,59 @@ const TYPES: CustomTypesConfig = {
   }
 }
 
+function clientConfig(config: ServerConnectionConfig): ClientConfig {
+  return {
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+    database: config.database || undefined,
+    // Explicitly false when off: left undefined, pg would read PGSSLMODE from the environment.
+    ssl: tlsOptions(config.ssl) ?? false,
+    connectionTimeoutMillis: 10_000,
+    application_name: 'Trowel',
+    types: TYPES
+  }
+}
+
+async function connected(config: ServerConnectionConfig): Promise<Client> {
+  const client = new Client(clientConfig(config))
+  // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
+  // queries reject with their own error.
+  client.on('error', (err) => console.error('postgres connection error:', err.message))
+  await client.connect().catch((err) => {
+    throw withoutNodeHint(err)
+  })
+  return client
+}
+
 export class PostgresClient implements DbClient {
-  private client: Client
+  private config: ServerConnectionConfig
+  private client?: Client
+  // The server process serving this connection, which a cancel targets.
+  private pid?: number
+  private running = 0
 
   constructor(config: ServerConnectionConfig) {
-    this.client = new Client({
-      host: config.host,
-      port: config.port,
-      user: config.user,
-      password: config.password,
-      database: config.database || undefined,
-      // Explicitly false when off: left undefined, pg would read PGSSLMODE from the environment.
-      ssl: tlsOptions(config.ssl) ?? false,
-      connectionTimeoutMillis: 10_000,
-      application_name: 'Trowel',
-      types: TYPES
-    })
-    // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
-    // queries reject with their own error.
-    this.client.on('error', (err) => console.error('postgres connection error:', err.message))
+    this.config = config
   }
 
   async connect(): Promise<void> {
-    await this.client.connect().catch((err) => {
-      throw withoutNodeHint(err)
-    })
+    this.client = await connected(this.config)
+    const { rows } = await this.client.query<{ pid: number }>('select pg_backend_pid() as pid')
+    this.pid = rows[0].pid
   }
 
+  // Cancels a running query first: the server doesn't notice a closed connection until it sends
+  // something, so it would keep running the query.
   async disconnect(): Promise<void> {
-    await this.client.end()
+    await this.cancel().catch((err) => console.error('postgres cancel failed:', err.message))
+    await this.client?.end()
+    this.client = undefined
   }
 
   async listTables(): Promise<TableInfo[]> {
-    const { rows } = await this.client.query<{ schema: string; name: string; kind: string }>(
+    const { rows } = await this.connection().query<{ schema: string; name: string; kind: string }>(
       LIST_TABLES
     )
     return rows.map((r) => ({
@@ -98,7 +118,7 @@ export class PostgresClient implements DbClient {
   }
 
   async listColumns(table: TableRef): Promise<ColumnInfo[]> {
-    const { rows } = await this.client.query<{
+    const { rows } = await this.connection().query<{
       name: string
       data_type: string
       nullable: boolean
@@ -115,11 +135,17 @@ export class PostgresClient implements DbClient {
   }
 
   async query(sql: string, params: unknown[] = []): Promise<QueryResult> {
+    const client = this.connection()
     const start = performance.now()
     // Without params pg uses the simple protocol, which accepts several statements and then
-    // resolves to one result per statement. Show the last, as psql does.
-    const res = (await this.client.query({ text: sql, values: params, rowMode: 'array' })) as
-      QueryArrayResult | QueryArrayResult[]
+    // resolves to one result per statement. Keep the last, as psql does.
+    let res: QueryArrayResult | QueryArrayResult[]
+    this.running++
+    try {
+      res = await client.query({ text: sql, values: params, rowMode: 'array' })
+    } finally {
+      this.running--
+    }
     const durationMs = performance.now() - start
     const last = Array.isArray(res) ? res[res.length - 1] : res
     return {
@@ -128,5 +154,23 @@ export class PostgresClient implements DbClient {
       rowCount: last.rowCount ?? last.rows.length,
       durationMs
     }
+  }
+
+  // Asks the server, over a second short-lived connection, to cancel what this connection's
+  // server process is running; the query then rejects with "canceling statement due to user
+  // request". An open transaction stays open, in the aborted state.
+  async cancel(): Promise<void> {
+    if (this.running === 0 || this.pid === undefined) return
+    const other = await connected(this.config)
+    try {
+      await other.query('select pg_cancel_backend($1)', [this.pid])
+    } finally {
+      await other.end()
+    }
+  }
+
+  private connection(): Client {
+    if (!this.client) throw new Error('Not connected')
+    return this.client
   }
 }

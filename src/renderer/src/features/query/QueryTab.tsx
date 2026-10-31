@@ -7,7 +7,7 @@ import { useLayout } from '@renderer/store/layout'
 import { useTabs, type QueryTabState } from '@renderer/store/tabs'
 import { editorLook, sqlLanguage, statementsToRun } from './editor'
 import { Results, RunStatus } from './Results'
-import { runQuery } from './run'
+import { cancelRun, runQuery } from './run'
 
 const RUN_SHORTCUT = navigator.userAgent.includes('Mac') ? '⌘↵' : 'Ctrl+Enter'
 
@@ -118,15 +118,26 @@ export function QueryTab({
           }}
           className="focus-ring absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize"
         />
-        <Button
-          variant="primary"
-          onClick={run}
-          disabled={tab.run?.state === 'running'}
-          title={`Run the selection, or the whole editor (${RUN_SHORTCUT})`}
-        >
-          Run
-          <span className="text-[11px] opacity-75">{RUN_SHORTCUT}</span>
-        </Button>
+        {tab.run?.state === 'running' ? (
+          <Button
+            onClick={() => cancelRun(connectionId, tab.id)}
+            disabled={tab.run.cancelling}
+            title="Stop the running statement; the statements after it don’t run"
+            className="min-w-20"
+          >
+            {tab.run.cancelling ? 'Cancelling…' : 'Cancel'}
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            onClick={run}
+            title={`Run the selection, or the whole editor (${RUN_SHORTCUT})`}
+            className="min-w-20"
+          >
+            Run
+            <span className="text-[11px] opacity-75">{RUN_SHORTCUT}</span>
+          </Button>
+        )}
         <span role="status" className="truncate text-[12px]">
           <RunStatus run={tab.run} />
         </span>

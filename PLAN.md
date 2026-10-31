@@ -84,7 +84,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   DevTools protocol, with screenshots in light and dark; the native file picker is untested.
   Not done: resizable panes, keyboard shortcuts for tabs (Cmd+W would need a custom app menu, since the default
   menu closes the window), and noticing a dropped connection.
-- [ ] **9. Query tab** — in three parts, each committed on its own.
+- [x] **9. Query tab** — in three parts, each committed on its own.
   - [x] **9a. Editor and results** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor.
     Results in AG Grid with row count and run time; show database errors in place of the grid. Register AG
     Grid modules once in `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`. Rows arrive
@@ -109,9 +109,19 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     procedure) into empty databases, and a SQLite trigger script. Not handled: psql meta-commands (`\connect`,
     and the `\restrict` lines pg_dump 18 writes) go to the server and fail; pg_dump's default `COPY ... FROM
     stdin` format needs psql.
-  - [ ] **9c. Cancel** — first check that killing a utility process is immediate while it is inside a
+  - [x] **9c. Cancel** — first check that killing a utility process is immediate while it is inside a
     long native SQLite call (the 10-second query test). Then SQLite in a `utilityProcess`, and
-    `api.db.cancel(connectionId)` for all three; Cancel also stops a script.
+    `api.db.cancel(connectionId)` for all three; Cancel also stops a script. Done. Measured first in a
+    bare Electron app: killing the process exited 5–14 ms after the kill, mid-query; a large insert
+    killed midway left the file passing `integrity_check` with the insert rolled back, in both rollback
+    and WAL journal modes. In the app, Run becomes Cancel while a run is going; closing a tab cancels
+    its query, and Postgres and MySQL `disconnect` cancel first. Tested in the built app: Postgres and
+    SQLite queries stop within milliseconds of Cancel and the connection keeps working (a SQLite temp
+    table is gone afterwards, as the message says); closing a tab mid-`pg_sleep` leaves nothing running on
+    the server; disconnecting or quitting during a long SQLite query takes about 0.2 s (it used to wait for
+    the query). MariaDB's `BENCHMARK()` stops early on `KILL QUERY` but returns a row, so a run Cancel was
+    asked for shows as cancelled even when its last statement returned. Not done: a keyboard shortcut for
+    Cancel.
 - [ ] **10. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a
@@ -122,6 +132,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   string, dates → ISO strings. Postgres/MySQL JSON columns arrive parsed and show as nested objects.
 - [ ] **12. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
-  Developer account for signing and notarization. Settle the app name (`trowel` now) before anyone relies on
+  Developer account for signing and notarization. Check that SQLite works in the packaged app: its utility
+  process (`sqlite.process.ts`) loads the native `better-sqlite3` from inside the asar, untested so far. Settle the app name (`trowel` now) before anyone relies on
   saved connections: the userData folder and the keychain entry (`<name> Safe Storage`) are both named after it,
   so a rename later loses saved connections or lists their passwords as empty.

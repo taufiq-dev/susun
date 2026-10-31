@@ -1,7 +1,8 @@
-// Runs one SQLite connection on a worker thread, because better-sqlite3 is synchronous and would
-// block the main process for the length of every query. `SqliteClient` in sqlite.ts is the other
-// end: it posts `{ id, method, args }` and gets back `{ id, ok, value }` or `{ id, ok, message }`.
-import { parentPort } from 'worker_threads'
+// Runs one SQLite connection in its own Electron utility process, because better-sqlite3 is
+// synchronous and would block the main process for the length of every query, and because killing
+// a process is the only way to stop a query running inside SQLite. `SqliteClient` in sqlite.ts is
+// the other end: it posts `{ id, method, args }` and gets back `{ id, ok, value }` or
+// `{ id, ok, message }`.
 import Database from 'better-sqlite3'
 import type { ColumnInfo, QueryResult, TableInfo, TableRef } from '@shared/types'
 
@@ -89,10 +90,11 @@ export type SqliteResponse =
   { id: number; ok: true; value: unknown } | { id: number; ok: false; message: string }
 
 function reply(response: SqliteResponse): void {
-  parentPort?.postMessage(response)
+  process.parentPort.postMessage(response)
 }
 
-parentPort?.on('message', ({ id, method, args }: SqliteRequest) => {
+process.parentPort.on('message', ({ data }) => {
+  const { id, method, args } = data as SqliteRequest
   try {
     const value = (methods[method] as (...a: unknown[]) => unknown)(...args)
     reply({ id, ok: true, value })

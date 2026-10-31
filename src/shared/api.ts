@@ -23,6 +23,10 @@ export interface DbApi {
   listTables(connectionId: string): Promise<TableInfo[]>
   listColumns(connectionId: string, table: TableRef): Promise<ColumnInfo[]>
   query(connectionId: string, sql: string, params?: unknown[]): Promise<QueryResult>
+  // Stops the query running on the connection, which then rejects. Does nothing if none is
+  // running or the connection is closed. On SQLite this reopens the database, which loses the
+  // session's state (an open transaction, temp tables, attached databases, settings).
+  cancel(connectionId: string): Promise<void>
 }
 
 // Saved connections. These are stored configs, not open connections: pass one's `config` to

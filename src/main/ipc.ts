@@ -66,7 +66,10 @@ const db: Handlers<DbApi> = {
   disconnect: (_event, connectionId) => close(connectionId),
   listTables: (_event, connectionId) => client(connectionId).listTables(),
   listColumns: (_event, connectionId, table) => client(connectionId).listColumns(table),
-  query: (_event, connectionId, sql, params) => client(connectionId).query(sql, params)
+  query: (_event, connectionId, sql, params) => client(connectionId).query(sql, params),
+  cancel: async (_event, connectionId) => {
+    await openConnections.get(connectionId)?.client.cancel()
+  }
 }
 
 const connections: Handlers<ConnectionsApi> = {

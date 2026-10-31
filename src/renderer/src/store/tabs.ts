@@ -2,19 +2,26 @@ import { create } from 'zustand'
 import type { Statement } from '@shared/split'
 import type { QueryResult, TableRef } from '@shared/types'
 
-// One statement of a run, with where it is in the editor and how it went.
-export type StatementRun = Statement & ({ result: QueryResult } | { error: string })
+// One statement of a run, with where it is in the editor and how it went. `cancelled` marks the
+// error of a statement stopped by Cancel.
+export type StatementRun = Statement &
+  ({ result: QueryResult } | { error: string; cancelled?: boolean })
 
 // The latest run of a query tab. It lives here rather than in the tab's component, which unmounts
 // when another tab is activated. `id` is new for each run.
 export interface QueryRun {
   id: number
-  state: 'running' | 'done' | 'failed'
+  state: 'running' | 'done' | 'failed' | 'cancelled'
   // How many statements the run has.
   total: number
   // Those that have run, in order. After a failure the last one has the error, and the statements
-  // after it didn't run.
+  // after it didn't run. Cancel stops the running statement (which then has an error) or, between
+  // statements, the next one from starting.
   statements: StatementRun[]
+  // Cancel has been asked for and the run hasn't stopped yet.
+  cancelling?: boolean
+  // Why asking to cancel failed, if it did.
+  cancelError?: string
   // What the results pane shows, once chosen: a statement's rows (its index in `statements`) or
   // the list of statements.
   view?: number | 'statements'

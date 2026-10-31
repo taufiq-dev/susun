@@ -15,7 +15,8 @@ const api: Api = {
     disconnect: (connectionId) => invoke('db:disconnect', connectionId),
     listTables: (connectionId) => invoke('db:listTables', connectionId),
     listColumns: (connectionId, table) => invoke('db:listColumns', connectionId, table),
-    query: (connectionId, sql, params) => invoke('db:query', connectionId, sql, params)
+    query: (connectionId, sql, params) => invoke('db:query', connectionId, sql, params),
+    cancel: (connectionId) => invoke('db:cancel', connectionId)
   },
   connections: {
     list: () => invoke('connections:list'),

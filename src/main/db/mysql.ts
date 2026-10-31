@@ -1,5 +1,10 @@
 import { isIP } from 'net'
-import { createConnection, type Connection, type RowDataPacket } from 'mysql2/promise'
+import {
+  createConnection,
+  type Connection,
+  type ConnectionOptions,
+  type RowDataPacket
+} from 'mysql2/promise'
 import type {
   ColumnInfo,
   QueryResult,
@@ -26,9 +31,40 @@ const LIST_COLUMNS = `
   where table_schema = coalesce(?, database()) and table_name = ?
   order by ordinal_position`
 
+async function connected(config: ServerConnectionConfig): Promise<Connection> {
+  const conn = await createConnection(connectionOptions(config)).catch((err) => {
+    throw withoutNodeHint(err)
+  })
+  // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
+  // queries reject with their own error.
+  conn.on('error', (err) => console.error('mysql connection error:', err.message))
+  return conn
+}
+
+function connectionOptions(config: ServerConnectionConfig): ConnectionOptions {
+  const tls = tlsOptions(config.ssl)
+  return {
+    host: config.host,
+    port: config.port,
+    user: config.user,
+    password: config.password,
+    database: config.database || undefined,
+    // mysql2 checks the certificate's host name only when asked to.
+    ssl: tls && { ...tls, verifyIdentity: tls.rejectUnauthorized },
+    connectTimeout: 10_000,
+    // BIGINT and DECIMAL values that don't fit a JS number arrive as strings instead of being
+    // rounded, so they display correctly and still match in a WHERE clause.
+    supportBigNumbers: true,
+    // Dates and times arrive as text, as the server formats them, rather than as JS Dates read
+    // in this computer's time zone.
+    dateStrings: true
+  }
+}
+
 export class MysqlClient implements DbClient {
   private config: ServerConnectionConfig
   private conn?: Connection
+  private running = 0
 
   constructor(config: ServerConnectionConfig) {
     this.config = config
@@ -41,31 +77,13 @@ export class MysqlClient implements DbClient {
     if (this.config.ssl === 'verify' && isIP(this.config.host)) {
       throw new Error("MySQL's SSL Verify mode needs the server's host name, not an IP address")
     }
-    const tls = tlsOptions(this.config.ssl)
-    this.conn = await createConnection({
-      host: this.config.host,
-      port: this.config.port,
-      user: this.config.user,
-      password: this.config.password,
-      database: this.config.database || undefined,
-      // mysql2 checks the certificate's host name only when asked to.
-      ssl: tls && { ...tls, verifyIdentity: tls.rejectUnauthorized },
-      connectTimeout: 10_000,
-      // BIGINT and DECIMAL values that don't fit a JS number arrive as strings instead of being
-      // rounded, so they display correctly and still match in a WHERE clause.
-      supportBigNumbers: true,
-      // Dates and times arrive as text, as the server formats them, rather than as JS Dates read
-      // in this computer's time zone.
-      dateStrings: true
-    }).catch((err) => {
-      throw withoutNodeHint(err)
-    })
-    // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
-    // queries reject with their own error.
-    this.conn.on('error', (err) => console.error('mysql connection error:', err.message))
+    this.conn = await connected(this.config)
   }
 
+  // Cancels a running query first: the server doesn't notice a closed connection until it sends
+  // something, so it would keep running the query.
   async disconnect(): Promise<void> {
+    await this.cancel().catch((err) => console.error('mysql cancel failed:', err.message))
     await this.conn?.end()
     this.conn = undefined
   }
@@ -90,8 +108,12 @@ export class MysqlClient implements DbClient {
   }
 
   async query(sql: string, params: unknown[] = []): Promise<QueryResult> {
+    const conn = this.connection()
     const start = performance.now()
-    const [result, fields] = await this.connection().query({ sql, rowsAsArray: true }, params)
+    this.running++
+    const [result, fields] = await conn
+      .query({ sql, rowsAsArray: true }, params)
+      .finally(() => this.running--)
     const durationMs = performance.now() - start
     // A statement that returns rows gives an array; anything else gives a ResultSetHeader.
     if (Array.isArray(result)) {
@@ -103,6 +125,19 @@ export class MysqlClient implements DbClient {
       rows: [],
       rowCount: 'affectedRows' in result ? result.affectedRows : 0,
       durationMs
+    }
+  }
+
+  // Kills the running query from a second short-lived connection; it then rejects with "Query
+  // execution was interrupted". The connection and its session stay.
+  async cancel(): Promise<void> {
+    const conn = this.conn
+    if (!conn || this.running === 0) return
+    const other = await connected(this.config)
+    try {
+      await other.query(`KILL QUERY ${Number(conn.threadId)}`)
+    } finally {
+      await other.end()
     }
   }
 
