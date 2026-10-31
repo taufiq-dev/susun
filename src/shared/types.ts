@@ -72,11 +72,14 @@ export const ROW_LIMIT = 10_000
 //
 // A statement that returns more than ROW_LIMIT rows keeps the first ROW_LIMIT, with `truncated`
 // set. Its `rowCount` is then how many it returned in all if the driver read every row anyway
-// (MySQL), or null if it stopped reading (Postgres, SQLite).
+// (MySQL), or null if it stopped reading (Postgres, SQLite). `stopped` says whether the statement
+// stopped running there too: a SELECT does, so it never worked out later rows nor called
+// functions for them, while an INSERT, UPDATE or DELETE ... RETURNING has made all its changes.
 export interface QueryResult {
   columns: string[]
   rows: unknown[][]
   rowCount: number | null
   truncated?: boolean
+  stopped?: boolean
   durationMs: number
 }

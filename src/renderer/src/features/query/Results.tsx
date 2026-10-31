@@ -18,21 +18,30 @@ function duration(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
-// What a statement did, e.g. "500 rows", "First 10,000 of 52,300 rows" or "3 rows changed".
+// What a statement did, e.g. "500 rows", "Stopped after 10,000 rows", "First 10,000 of 52,300
+// rows" or "3 rows changed".
 function outcome(result: QueryResult): string {
   if (result.columns.length === 0) return `${count(result.rowCount ?? 0, 'row')} changed`
   if (!result.truncated) return count(result.rows.length, 'row')
-  const first = `First ${result.rows.length.toLocaleString()}`
-  return result.rowCount === null ? `${first} rows` : `${first} of ${count(result.rowCount, 'row')}`
+  const kept = result.rows.length.toLocaleString()
+  if (result.stopped) return `Stopped after ${kept} rows`
+  return result.rowCount === null
+    ? `First ${kept} rows`
+    : `First ${kept} of ${count(result.rowCount, 'row')}`
 }
 
 // A tooltip for a result that was cut short.
 function truncatedHint(result: QueryResult): string | undefined {
   if (!result.truncated) return undefined
-  return (
-    `The statement returned more rows than the ${ROW_LIMIT.toLocaleString()} Trowel keeps. ` +
-    'Narrow it with WHERE or LIMIT to see others.'
-  )
+  const limit = ROW_LIMIT.toLocaleString()
+  if (result.stopped) {
+    return (
+      `Trowel keeps ${limit} rows of a result, so it stopped the query there: nothing past that ` +
+      'point ran, including functions it would have called for later rows. Narrow it with WHERE ' +
+      'or LIMIT to see other rows.'
+    )
+  }
+  return `The statement ran to the end, but returned more rows than the ${limit} Trowel keeps.`
 }
 
 function returnsRows(s: StatementRun): boolean {

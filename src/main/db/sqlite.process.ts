@@ -11,6 +11,7 @@ import {
   type TableInfo,
   type TableRef
 } from '@shared/types'
+import { stopsAtLimit } from './limit'
 
 const LIST_TABLES = `
   select name, type from sqlite_schema
@@ -73,8 +74,8 @@ const methods = {
       .raw(true)
       .safeIntegers(true)
       .iterate(...params) as Iterable<unknown[]>
-    // Stepping stops at the limit, and so does SQLite's work on the query. An INSERT, UPDATE or
-    // DELETE ... RETURNING has made all its changes by its first row.
+    // Stepping stops at the limit, and so does SQLite's work on the query, unless it has already
+    // finished (see stopsAtLimit).
     const rows: unknown[][] = []
     let truncated = false
     for (const row of results) {
@@ -85,7 +86,14 @@ const methods = {
       rows.push(row.map(toSafeValue))
     }
     const durationMs = performance.now() - start
-    return { columns, rows, rowCount: truncated ? null : rows.length, truncated, durationMs }
+    return {
+      columns,
+      rows,
+      rowCount: truncated ? null : rows.length,
+      truncated,
+      stopped: truncated && stopsAtLimit(sql),
+      durationMs
+    }
   }
 }
 

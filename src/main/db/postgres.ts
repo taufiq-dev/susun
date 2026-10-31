@@ -15,6 +15,7 @@ import {
   type TableRef
 } from '@shared/types'
 import type { DbClient } from './client'
+import { stopsAtLimit } from './limit'
 import { tlsOptions, withoutNodeHint } from './tls'
 
 // relkind: r table, p partitioned table, f foreign table, v view, m materialized view.
@@ -157,8 +158,7 @@ export class PostgresClient implements DbClient {
     const client = this.connection()
     const start = performance.now()
     // A cursor asks for one row more than the limit, then closes, so the server stops producing
-    // rows there instead of sending them all. An INSERT, UPDATE or DELETE ... RETURNING has made
-    // all its changes by then; a SELECT stops early. Cursors take one statement at a time.
+    // rows there instead of sending them all (see stopsAtLimit). Cursors take one statement.
     const cursor = client.query(
       new Cursor<unknown[]>(sql, params, { rowMode: 'array', types: TYPES })
     )
@@ -174,6 +174,7 @@ export class PostgresClient implements DbClient {
         rows: truncated ? rows.slice(0, ROW_LIMIT) : rows,
         rowCount: truncated ? null : (result.rowCount ?? rows.length),
         truncated,
+        stopped: truncated && stopsAtLimit(sql),
         durationMs
       }
     } finally {

@@ -128,18 +128,20 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     asked for shows as cancelled even when its last statement returned. Not done: a keyboard shortcut for
     Cancel.
   - [x] **9d. Row limit** — each statement keeps its first 10,000 rows (`ROW_LIMIT`), and the status says so:
-    "First 10,000 rows" (Postgres, SQLite) or "First 10,000 of 2,000,000 rows" (MySQL, which reads every
-    row anyway), with a tooltip saying why. Postgres reads through `pg-cursor` (new dependency) and SQLite
-    steps row by row, both stopping at the limit; MySQL streams and drops the rest (see CLAUDE.md).
-    Measured with a 2-million-row select through `window.api`: before, 47 s until the renderer had the
-    rows (1.4 s of it in the driver, the rest copying them over IPC), with peak memory of 576 MB in the
-    main process and 728 MB in the renderer; after, 0.16 s on Postgres and 0.8 s on MariaDB, with no
-    growth in the renderer and at most 13 MB in the main process. Tested in the built app against
-    Postgres 18, MariaDB 13 and SQLite: exactly 10,000 rows isn't marked as cut short, 10,001 is; a
-    DELETE ... RETURNING of 25,000 rows (and a Postgres data-modifying CTE, and a MariaDB and SQLite
-    INSERT ... RETURNING) still changes all 25,000; types, params, transactions across calls, VACUUM and
-    CREATE INDEX CONCURRENTLY work through the cursor; Cancel works during a Postgres cursor read and while
-    MariaDB streams 100 million rows.
+    "Stopped after 10,000 rows" for a Postgres or SQLite SELECT, which stops running at the limit (a function it
+    calls that changes data runs for only the first 10,001 rows: tested); "First 10,000 rows" for an
+    INSERT/UPDATE/DELETE ... RETURNING, which has made all its changes; "First 10,000 of 2,000,000 rows" on
+    MySQL, which reads every row anyway. A tooltip says which happened and why. Postgres reads through
+    `pg-cursor` (new dependency) and SQLite steps row by row, both stopping at the limit; MySQL streams and
+    drops the rest (see CLAUDE.md). Measured with a 2-million-row select through `window.api`: before, 47 s
+    until the renderer had the rows (1.4 s of it in the driver, the rest copying them over IPC), with peak
+    memory of 576 MB in the main process and 728 MB in the renderer; after, 0.16 s on Postgres and 0.8 s on
+    MariaDB, with no growth in the renderer and at most 13 MB in the main process. Tested in the built app
+    against Postgres 18, MariaDB 13 and SQLite (and `stopsAtLimit` in Vitest): exactly 10,000 rows isn't marked
+    as cut short, 10,001 is; a DELETE ... RETURNING of 25,000 rows (and a Postgres data-modifying CTE, and a
+    MariaDB and SQLite INSERT ... RETURNING) still changes all 25,000; types, params, transactions across calls,
+    VACUUM and CREATE INDEX CONCURRENTLY work through the cursor; Cancel works during a Postgres cursor read and
+    while MariaDB streams 100 million rows.
 - [ ] **10. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a
