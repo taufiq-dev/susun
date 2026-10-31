@@ -97,10 +97,18 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     CLAUDE.md). Tested in the built app against Postgres 18, MariaDB 13 and SQLite. Not done: completing
     table and column names (the editor completes keywords only), and a row limit: a query returns all its
     rows, so `select *` on a huge table loads every row into memory.
-  - [ ] **9b. Scripts** — the splitter in `src/shared/` (quotes, comments and identifiers per database,
+  - [x] **9b. Scripts** — the splitter in `src/shared/` (quotes, comments and identifiers per database,
     Postgres dollar quoting, MySQL `DELIMITER`, trigger and procedure bodies), with Vitest as the test runner.
     A result tab per statement that returns rows, a one-line summary for the rest, and an error that names
-    the failing statement and its line.
+    the failing statement and its line. Done: `splitStatements` in `src/shared/split.ts` with 54
+    Vitest cases; the results pane shows a tab per statement with rows and a Statements list (line, first
+    line of SQL, outcome, time; a line number selects that statement in the editor; the failing statement's
+    error under it). Until one is picked, a finished script shows its last rows, a failed one the list.
+    Tested in the built app by restoring a `pg_dump --inserts` (533 statements: plpgsql trigger, `BEGIN
+    ATOMIC` function) and a `mariadb-dump --routines --triggers` (84 statements: `DELIMITER ;;` trigger and
+    procedure) into empty databases, and a SQLite trigger script. Not handled: psql meta-commands (`\connect`,
+    and the `\restrict` lines pg_dump 18 writes) go to the server and fail; pg_dump's default `COPY ... FROM
+    stdin` format needs psql.
   - [ ] **9c. Cancel** — first check that killing a utility process is immediate while it is inside a
     long native SQLite call (the 10-second query test). Then SQLite in a `utilityProcess`, and
     `api.db.cancel(connectionId)` for all three; Cancel also stops a script.

@@ -16,6 +16,7 @@ Package manager is pnpm 11.
 pnpm dev                 # electron-vite dev server + app; renderer has HMR
 pnpm dev --watch         # also rebuild/restart on main or preload changes (otherwise restart manually)
 pnpm lint                # ESLint (flat config, cached in .eslintcache)
+pnpm test                # Vitest, once (pnpm test:watch to re-run on change); tests are src/**/*.test.ts
 pnpm typecheck           # tsc on both TS projects; typecheck:node or typecheck:web for one side
 pnpm format              # Prettier --write
 pnpm build               # typecheck, then electron-vite build into out/
@@ -23,7 +24,7 @@ pnpm start               # run the built app from out/
 pnpm build:mac           # package with electron-builder into dist/ (also build:win, build:linux, build:unpack)
 ```
 
-`build:mac` and `build:linux` skip the typecheck (they call `electron-vite build` directly); `build:win` and `build:unpack` go through `pnpm build`. There is no test runner yet.
+`build:mac` and `build:linux` skip the typecheck (they call `electron-vite build` directly); `build:win` and `build:unpack` go through `pnpm build`. Vitest (`vitest.config.ts`, which repeats the `@shared` alias) covers pure code such as the SQL splitter; the database clients and UI are tested by driving the built app (below).
 
 To run the built app without touching the real userData folder or the login keychain (e.g. when testing saved connections), use `node_modules/.bin/electron . --user-data-dir=<scratch dir> --use-mock-keychain`; add `--remote-debugging-port=9333` to drive `window.api` over the DevTools protocol.
 
@@ -51,6 +52,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
   - A statement that returns no rows gives empty `columns`/`rows` and its affected-row count.
   - Each client attaches an `'error'` listener, since an unhandled driver `'error'` event crashes the main process.
 - TLS: `tlsOptions(config.ssl)` in `src/main/db/tls.ts` gives both server clients their TLS options. `verify` passes an explicit `ca` list (Node's default list plus the OS store), since a `ca` option replaces Node's list rather than adding to it. Driver quirks it works around: pg reads `PGSSLMODE` unless `ssl` is set (so off is an explicit `false`); mysql2 checks the host name only with `verifyIdentity`, and not at all correctly for an IP host (so MySQL refuses `verify` with one). Connect errors go through `withoutNodeHint`, which drops Node's inapplicable `--use-system-ca` advice.
+- Scripts: the query tab splits its SQL with `splitStatements` (`src/shared/split.ts`) and runs the statements one at a time, stopping at the first error, as psql, the mysql client and sqlite3 do. The splitter follows each database's lexical rules (quotes and escapes, comments, Postgres dollar quotes, MySQL `DELIMITER` and executable comments, BEGIN ... END bodies of triggers and routines); `split.test.ts` lists the cases. `DbClient.query` still takes one statement.
 - The renderer reaches the database only through `window.api`. New features should not use the raw `window.electron.ipcRenderer`. To add a method:
   1. Declare it in `Api` in `src/shared/api.ts`.
   2. Implement it in the group's `Handlers` object in `src/main/ipc.ts`, with the same signature plus a leading `IpcMainInvokeEvent`. `handle(group, handlers)` registers each method as channel `<group>:<method>`.

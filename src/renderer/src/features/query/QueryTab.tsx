@@ -5,7 +5,7 @@ import type { DbType } from '@shared/types'
 import { Button } from '@renderer/components/ui'
 import { useLayout } from '@renderer/store/layout'
 import { useTabs, type QueryTabState } from '@renderer/store/tabs'
-import { editorLook, sqlLanguage, sqlToRun } from './editor'
+import { editorLook, sqlLanguage, statementsToRun } from './editor'
 import { Results, RunStatus } from './Results'
 import { runQuery } from './run'
 
@@ -23,6 +23,7 @@ export function QueryTab({
   dbType: DbType
 }): React.JSX.Element {
   const setSql = useTabs((s) => s.setSql)
+  const setRunView = useTabs((s) => s.setRunView)
   const editorFraction = useLayout((s) => s.editorFraction)
   const setEditorFraction = useLayout((s) => s.setEditorFraction)
   const editor = useRef<ReactCodeMirrorRef>(null)
@@ -39,7 +40,7 @@ export function QueryTab({
             key: 'Mod-Enter',
             run: (view) => {
               closeCompletion(view)
-              runQuery(connectionId, tab.id, sqlToRun(view.state))
+              void runQuery(connectionId, tab.id, statementsToRun(view.state, dbType))
               return true
             }
           }
@@ -52,7 +53,19 @@ export function QueryTab({
   const run = (): void => {
     const view = editor.current?.view
     if (!view) return
-    runQuery(connectionId, tab.id, sqlToRun(view.state))
+    void runQuery(connectionId, tab.id, statementsToRun(view.state, dbType))
+    view.focus()
+  }
+
+  // Offsets are from when the statement ran, so they're kept inside the text as it is now.
+  const showStatement = (from: number, to: number): void => {
+    const view = editor.current?.view
+    if (!view) return
+    const length = view.state.doc.length
+    view.dispatch({
+      selection: { anchor: Math.min(from, length), head: Math.min(to, length) },
+      scrollIntoView: true
+    })
     view.focus()
   }
 
@@ -120,7 +133,12 @@ export function QueryTab({
       </div>
 
       <div className="min-h-0 flex-1">
-        <Results run={tab.run} shortcut={RUN_SHORTCUT} />
+        <Results
+          run={tab.run}
+          shortcut={RUN_SHORTCUT}
+          onView={(view) => setRunView(tab.id, view)}
+          onShowStatement={showStatement}
+        />
       </div>
     </div>
   )

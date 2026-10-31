@@ -1,11 +1,24 @@
 import { create } from 'zustand'
+import type { Statement } from '@shared/split'
 import type { QueryResult, TableRef } from '@shared/types'
+
+// One statement of a run, with where it is in the editor and how it went.
+export type StatementRun = Statement & ({ result: QueryResult } | { error: string })
 
 // The latest run of a query tab. It lives here rather than in the tab's component, which unmounts
 // when another tab is activated. `id` is new for each run.
-export type QueryRun = { id: number } & (
-  { state: 'running' } | { state: 'done'; result: QueryResult } | { state: 'failed'; error: string }
-)
+export interface QueryRun {
+  id: number
+  state: 'running' | 'done' | 'failed'
+  // How many statements the run has.
+  total: number
+  // Those that have run, in order. After a failure the last one has the error, and the statements
+  // after it didn't run.
+  statements: StatementRun[]
+  // What the results pane shows, once chosen: a statement's rows (its index in `statements`) or
+  // the list of statements.
+  view?: number | 'statements'
+}
 
 export interface QueryTabState {
   id: string
@@ -35,8 +48,9 @@ interface TabsState {
   activate(id: string): void
   close(id: string): void
   setSql(id: string, sql: string): void
-  // Does nothing if the tab has been closed.
+  // Both do nothing if the tab has been closed.
   setRun(id: string, run: QueryRun): void
+  setRunView(id: string, view: NonNullable<QueryRun['view']>): void
   reset(): void
 }
 
@@ -90,6 +104,13 @@ export const useTabs = create<TabsState>()((set) => ({
   setRun: (id, run) =>
     set((s) => ({
       tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? { ...t, run } : t))
+    })),
+
+  setRunView: (id, view) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) =>
+        t.id === id && t.type === 'query' && t.run ? { ...t, run: { ...t.run, view } } : t
+      )
     })),
 
   reset: () => set({ tabs: [], activeId: null, queryCount: 0 })

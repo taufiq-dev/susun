@@ -2,6 +2,7 @@ import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { MySQL, PostgreSQL, SQLite, sql, type SQLDialect } from '@codemirror/lang-sql'
 import { tags as t } from '@lezer/highlight'
 import { EditorView, type EditorState, type Extension } from '@uiw/react-codemirror'
+import { splitStatements, type Statement } from '@shared/split'
 import type { DbType } from '@shared/types'
 
 const DIALECTS: Record<DbType, SQLDialect> = {
@@ -68,8 +69,16 @@ const highlight = HighlightStyle.define([
 
 export const editorLook: Extension = [theme, syntaxHighlighting(highlight)]
 
-// The selection if there is one, otherwise the whole editor.
-export function sqlToRun(state: EditorState): string {
+// The statements in the selection if there is one, otherwise in the whole editor, with their
+// offsets and lines in the editor.
+export function statementsToRun(state: EditorState, type: DbType): Statement[] {
   const { from, to } = state.selection.main
-  return from === to ? state.doc.toString() : state.sliceDoc(from, to)
+  const start = from === to ? 0 : from
+  const sql = from === to ? state.doc.toString() : state.sliceDoc(from, to)
+  return splitStatements(sql, type).map((s) => ({
+    ...s,
+    from: s.from + start,
+    to: s.to + start,
+    line: state.doc.lineAt(s.from + start).number
+  }))
 }
