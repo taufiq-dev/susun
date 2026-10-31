@@ -1,5 +1,5 @@
 import { Fragment } from 'react'
-import type { QueryResult } from '@shared/types'
+import { ROW_LIMIT, type QueryResult } from '@shared/types'
 import { ResultGrid } from '@renderer/components/ResultGrid'
 import type { QueryRun, StatementRun } from '@renderer/store/tabs'
 
@@ -18,11 +18,21 @@ function duration(ms: number): string {
   return `${(ms / 1000).toFixed(2)} s`
 }
 
-// What a statement did, e.g. "500 rows" or "3 rows changed".
+// What a statement did, e.g. "500 rows", "First 10,000 of 52,300 rows" or "3 rows changed".
 function outcome(result: QueryResult): string {
-  return result.columns.length > 0
-    ? count(result.rows.length, 'row')
-    : `${count(result.rowCount, 'row')} changed`
+  if (result.columns.length === 0) return `${count(result.rowCount ?? 0, 'row')} changed`
+  if (!result.truncated) return count(result.rows.length, 'row')
+  const first = `First ${result.rows.length.toLocaleString()}`
+  return result.rowCount === null ? `${first} rows` : `${first} of ${count(result.rowCount, 'row')}`
+}
+
+// A tooltip for a result that was cut short.
+function truncatedHint(result: QueryResult): string | undefined {
+  if (!result.truncated) return undefined
+  return (
+    `The statement returned more rows than the ${ROW_LIMIT.toLocaleString()} Trowel keeps. ` +
+    'Narrow it with WHERE or LIMIT to see others.'
+  )
 }
 
 function returnsRows(s: StatementRun): boolean {
@@ -75,11 +85,10 @@ export function RunStatus({ run }: { run?: QueryRun }): React.JSX.Element | null
     0
   )
   const first = run.statements[0]
-  const what =
-    run.total === 1 && 'result' in first ? outcome(first.result) : count(done, 'statement')
+  const single = run.total === 1 && 'result' in first ? first.result : undefined
   return (
-    <span className="text-muted">
-      {what} in {duration(totalMs)}
+    <span className="text-muted" title={single && truncatedHint(single)}>
+      {single ? outcome(single) : count(done, 'statement')} in {duration(totalMs)}
     </span>
   )
 }
@@ -177,7 +186,10 @@ function ScriptResults({
           </ViewTab>
         </div>
         {shown && 'result' in shown && (
-          <span className="ml-auto self-center truncate px-2 text-[12px] text-muted">
+          <span
+            className="ml-auto self-center truncate px-2 text-[12px] text-muted"
+            title={truncatedHint(shown.result)}
+          >
             Line {shown.line}: {outcome(shown.result)} in {duration(shown.result.durationMs)}
           </span>
         )}
@@ -284,7 +296,12 @@ function StatementList({
                         {s.cancelled ? 'Cancelled' : 'Failed'}
                       </span>
                     ) : s.result.columns.length > 0 ? (
-                      <button type="button" onClick={() => onView(index)} className={LINK}>
+                      <button
+                        type="button"
+                        title={truncatedHint(s.result)}
+                        onClick={() => onView(index)}
+                        className={LINK}
+                      >
                         {outcome(s.result)}
                       </button>
                     ) : (

@@ -33,6 +33,12 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   can come later. Tested against Postgres 18 and MariaDB 13 with a test CA, untrusted and then trusted through
   `NODE_EXTRA_CA_CERTS`; a CA installed in the macOS keychain is untested.
 
+- **Row limit: keep the first 10,000 rows of each statement, no "load more".** Loading more later would
+  mean holding the query open between clicks: on Postgres that blocks the connection every tab shares and
+  keeps a transaction open, and mysql2 can't do it at all. Re-running with a higher limit would repeat a
+  statement's changes. The table tab pages with its own `LIMIT`; getting every row of a big query would be
+  an export to a file, not planned yet.
+
 ## Steps
 
 - [x] **1. Prerequisites** — Node 24.22.1, pnpm 11.24.0.
@@ -84,7 +90,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   DevTools protocol, with screenshots in light and dark; the native file picker is untested.
   Not done: resizable panes, keyboard shortcuts for tabs (Cmd+W would need a custom app menu, since the default
   menu closes the window), and noticing a dropped connection.
-- [x] **9. Query tab** — in three parts, each committed on its own.
+- [x] **9. Query tab** — in four parts, each committed on its own.
   - [x] **9a. Editor and results** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor.
     Results in AG Grid with row count and run time; show database errors in place of the grid. Register AG
     Grid modules once in `main.tsx` with `ModuleRegistry.registerModules([AllCommunityModule])`. Rows arrive
@@ -95,8 +101,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     italics (unlike the text 'NULL'), binary as hex (first 32 bytes) and JSON as text, and sizes columns to
     their contents up to 360 px. Dates and times now arrive as strings as the database formats them (see
     CLAUDE.md). Tested in the built app against Postgres 18, MariaDB 13 and SQLite. Not done: completing
-    table and column names (the editor completes keywords only), and a row limit: a query returns all its
-    rows, so `select *` on a huge table loads every row into memory.
+    table and column names (the editor completes keywords only). A row limit came in 9d.
   - [x] **9b. Scripts** — the splitter in `src/shared/` (quotes, comments and identifiers per database,
     Postgres dollar quoting, MySQL `DELIMITER`, trigger and procedure bodies), with Vitest as the test runner.
     A result tab per statement that returns rows, a one-line summary for the rest, and an error that names
@@ -122,6 +127,19 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     the query). MariaDB's `BENCHMARK()` stops early on `KILL QUERY` but returns a row, so a run Cancel was
     asked for shows as cancelled even when its last statement returned. Not done: a keyboard shortcut for
     Cancel.
+  - [x] **9d. Row limit** — each statement keeps its first 10,000 rows (`ROW_LIMIT`), and the status says so:
+    "First 10,000 rows" (Postgres, SQLite) or "First 10,000 of 2,000,000 rows" (MySQL, which reads every
+    row anyway), with a tooltip saying why. Postgres reads through `pg-cursor` (new dependency) and SQLite
+    steps row by row, both stopping at the limit; MySQL streams and drops the rest (see CLAUDE.md).
+    Measured with a 2-million-row select through `window.api`: before, 47 s until the renderer had the
+    rows (1.4 s of it in the driver, the rest copying them over IPC), with peak memory of 576 MB in the
+    main process and 728 MB in the renderer; after, 0.16 s on Postgres and 0.8 s on MariaDB, with no
+    growth in the renderer and at most 13 MB in the main process. Tested in the built app against
+    Postgres 18, MariaDB 13 and SQLite: exactly 10,000 rows isn't marked as cut short, 10,001 is; a
+    DELETE ... RETURNING of 25,000 rows (and a Postgres data-modifying CTE, and a MariaDB and SQLite
+    INSERT ... RETURNING) still changes all 25,000; types, params, transactions across calls, VACUUM and
+    CREATE INDEX CONCURRENTLY work through the cursor; Cancel works during a Postgres cursor read and while
+    MariaDB streams 100 million rows.
 - [ ] **10. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a

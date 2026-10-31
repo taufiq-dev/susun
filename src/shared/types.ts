@@ -63,12 +63,20 @@ export interface ColumnInfo {
   primaryKey: boolean
 }
 
+// The most rows a query result keeps, so a large result can't fill the app's memory.
+export const ROW_LIMIT = 10_000
+
 // Rows are arrays in `columns` order, so duplicate column names (`select a.id, b.id`) survive.
 // Integers too large for a JS number arrive as strings. Statements that return no rows have empty
 // `columns` and `rows`, and `rowCount` is the number of rows they changed.
+//
+// A statement that returns more than ROW_LIMIT rows keeps the first ROW_LIMIT, with `truncated`
+// set. Its `rowCount` is then how many it returned in all if the driver read every row anyway
+// (MySQL), or null if it stopped reading (Postgres, SQLite).
 export interface QueryResult {
   columns: string[]
   rows: unknown[][]
-  rowCount: number
+  rowCount: number | null
+  truncated?: boolean
   durationMs: number
 }

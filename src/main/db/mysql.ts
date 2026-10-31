@@ -1,16 +1,20 @@
 import { isIP } from 'net'
+import type { Connection as CoreConnection } from 'mysql2'
 import {
   createConnection,
   type Connection,
   type ConnectionOptions,
+  type FieldPacket,
+  type ResultSetHeader,
   type RowDataPacket
 } from 'mysql2/promise'
-import type {
-  ColumnInfo,
-  QueryResult,
-  ServerConnectionConfig,
-  TableInfo,
-  TableRef
+import {
+  ROW_LIMIT,
+  type ColumnInfo,
+  type QueryResult,
+  type ServerConnectionConfig,
+  type TableInfo,
+  type TableRef
 } from '@shared/types'
 import type { DbClient } from './client'
 import { tlsOptions, withoutNodeHint } from './tls'
@@ -59,6 +63,54 @@ function connectionOptions(config: ServerConnectionConfig): ConnectionOptions {
     // in this computer's time zone.
     dateStrings: true
   }
+}
+
+// Runs a statement reading its rows as they arrive, keeping the first ROW_LIMIT and only counting
+// the rest. The server sends every row whatever the client does: stopping it would mean killing
+// the statement, which could leave a MariaDB INSERT ... RETURNING half done. Of a CALL's result
+// sets, only the first is kept.
+function streamQuery(
+  conn: Connection,
+  sql: string,
+  params: unknown[]
+): Promise<Omit<QueryResult, 'durationMs'>> {
+  return new Promise((resolve, reject) => {
+    let columns: string[] | undefined
+    // Set once the first result set with columns has ended.
+    let firstDone = false
+    const rows: unknown[][] = []
+    let total = 0
+    let changed = 0
+    let failed = false
+    // The promise wrapper's query collects every row; the core connection's emits them one by one.
+    const query = core(conn).query({ sql, rowsAsArray: true }, params)
+    // Once per result, before its rows; undefined for one without rows.
+    query.on('fields', (fields: FieldPacket[] | undefined) => {
+      if (columns) firstDone = true
+      else if (fields) columns = fields.map((f) => f.name)
+    })
+    query.on('result', (row: unknown[] | ResultSetHeader) => {
+      if (!Array.isArray(row)) changed += row.affectedRows
+      else if (!firstDone) {
+        total++
+        if (rows.length < ROW_LIMIT) rows.push(row)
+      }
+    })
+    query.on('error', (err) => {
+      failed = true
+      reject(err)
+    })
+    query.on('end', () => {
+      if (failed) return
+      if (!columns) resolve({ columns: [], rows: [], rowCount: changed })
+      else resolve({ columns, rows, rowCount: total, truncated: total > ROW_LIMIT })
+    })
+  })
+}
+
+// mysql2's types leave out the promise wrapper's `connection` property.
+function core(conn: Connection): CoreConnection {
+  return (conn as unknown as { connection: CoreConnection }).connection
 }
 
 export class MysqlClient implements DbClient {
@@ -111,20 +163,11 @@ export class MysqlClient implements DbClient {
     const conn = this.connection()
     const start = performance.now()
     this.running++
-    const [result, fields] = await conn
-      .query({ sql, rowsAsArray: true }, params)
-      .finally(() => this.running--)
-    const durationMs = performance.now() - start
-    // A statement that returns rows gives an array; anything else gives a ResultSetHeader.
-    if (Array.isArray(result)) {
-      const rows = result as unknown[][]
-      return { columns: fields.map((f) => f.name), rows, rowCount: rows.length, durationMs }
-    }
-    return {
-      columns: [],
-      rows: [],
-      rowCount: 'affectedRows' in result ? result.affectedRows : 0,
-      durationMs
+    try {
+      const result = await streamQuery(conn, sql, params)
+      return { ...result, durationMs: performance.now() - start }
+    } finally {
+      this.running--
     }
   }
 

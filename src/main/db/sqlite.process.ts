@@ -4,7 +4,13 @@
 // the other end: it posts `{ id, method, args }` and gets back `{ id, ok, value }` or
 // `{ id, ok, message }`.
 import Database from 'better-sqlite3'
-import type { ColumnInfo, QueryResult, TableInfo, TableRef } from '@shared/types'
+import {
+  ROW_LIMIT,
+  type ColumnInfo,
+  type QueryResult,
+  type TableInfo,
+  type TableRef
+} from '@shared/types'
 
 const LIST_TABLES = `
   select name, type from sqlite_schema
@@ -60,15 +66,26 @@ const methods = {
       const { changes } = stmt.run(...params)
       return { columns: [], rows: [], rowCount: changes, durationMs: performance.now() - start }
     }
+    const columns = stmt.columns().map((c) => c.name)
     // safeIntegers returns every integer as a bigint; turn them back into numbers unless that
     // would lose precision, as the MySQL client does.
-    const raw = stmt
+    const results = stmt
       .raw(true)
       .safeIntegers(true)
-      .all(...params) as unknown[][]
+      .iterate(...params) as Iterable<unknown[]>
+    // Stepping stops at the limit, and so does SQLite's work on the query. An INSERT, UPDATE or
+    // DELETE ... RETURNING has made all its changes by its first row.
+    const rows: unknown[][] = []
+    let truncated = false
+    for (const row of results) {
+      if (rows.length === ROW_LIMIT) {
+        truncated = true
+        break
+      }
+      rows.push(row.map(toSafeValue))
+    }
     const durationMs = performance.now() - start
-    const rows = raw.map((row) => row.map(toSafeValue))
-    return { columns: stmt.columns().map((c) => c.name), rows, rowCount: rows.length, durationMs }
+    return { columns, rows, rowCount: truncated ? null : rows.length, truncated, durationMs }
   }
 }
 

@@ -1,10 +1,18 @@
-import { Client, types, type ClientConfig, type CustomTypesConfig, type QueryArrayResult } from 'pg'
-import type {
-  ColumnInfo,
-  QueryResult,
-  ServerConnectionConfig,
-  TableInfo,
-  TableRef
+import {
+  Client,
+  types,
+  type ClientConfig,
+  type CustomTypesConfig,
+  type QueryResult as PgResult
+} from 'pg'
+import Cursor from 'pg-cursor'
+import {
+  ROW_LIMIT,
+  type ColumnInfo,
+  type QueryResult,
+  type ServerConnectionConfig,
+  type TableInfo,
+  type TableRef
 } from '@shared/types'
 import type { DbClient } from './client'
 import { tlsOptions, withoutNodeHint } from './tls'
@@ -53,6 +61,17 @@ const TYPES: CustomTypesConfig = {
     if (AS_TEXT_ARRAY.has(oid)) return parseTextArray
     return types.getTypeParser(oid, format)
   }
+}
+
+// Reads up to `maxRows` rows. The promise form of `cursor.read` drops the result, which holds the
+// column names. After an error the cursor calls back a second time; the promise keeps the first.
+function read(
+  cursor: Cursor<unknown[]>,
+  maxRows: number
+): Promise<{ rows: unknown[][]; result: PgResult }> {
+  return new Promise((resolve, reject) => {
+    cursor.read(maxRows, (err, rows, result) => (err ? reject(err) : resolve({ rows, result })))
+  })
 }
 
 function clientConfig(config: ServerConnectionConfig): ClientConfig {
@@ -137,22 +156,28 @@ export class PostgresClient implements DbClient {
   async query(sql: string, params: unknown[] = []): Promise<QueryResult> {
     const client = this.connection()
     const start = performance.now()
-    // Without params pg uses the simple protocol, which accepts several statements and then
-    // resolves to one result per statement. Keep the last, as psql does.
-    let res: QueryArrayResult | QueryArrayResult[]
+    // A cursor asks for one row more than the limit, then closes, so the server stops producing
+    // rows there instead of sending them all. An INSERT, UPDATE or DELETE ... RETURNING has made
+    // all its changes by then; a SELECT stops early. Cursors take one statement at a time.
+    const cursor = client.query(
+      new Cursor<unknown[]>(sql, params, { rowMode: 'array', types: TYPES })
+    )
     this.running++
     try {
-      res = await client.query({ text: sql, values: params, rowMode: 'array' })
+      const { rows, result } = await read(cursor, ROW_LIMIT + 1)
+      const truncated = rows.length > ROW_LIMIT
+      // Ends the statement if it has more rows; otherwise the cursor has already closed.
+      await cursor.close()
+      const durationMs = performance.now() - start
+      return {
+        columns: result.fields.map((f) => f.name),
+        rows: truncated ? rows.slice(0, ROW_LIMIT) : rows,
+        rowCount: truncated ? null : (result.rowCount ?? rows.length),
+        truncated,
+        durationMs
+      }
     } finally {
       this.running--
-    }
-    const durationMs = performance.now() - start
-    const last = Array.isArray(res) ? res[res.length - 1] : res
-    return {
-      columns: last.fields.map((f) => f.name),
-      rows: last.rows,
-      rowCount: last.rowCount ?? last.rows.length,
-      durationMs
     }
   }
 
