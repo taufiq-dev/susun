@@ -55,6 +55,9 @@ export interface QueryTabState {
   sessionId?: string
   // The editor's share of the tab's height; the results get the rest.
   editorFraction: number
+  // The SQL it was opened with from elsewhere (a history entry, a table's menu), if any: until it
+  // changes, closing the tab loses nothing, so it isn't unsaved.
+  initialSql?: string
   // The .sql file the tab was opened from or last saved to, and the SQL as read or written then,
   // which tells whether the tab has unsaved changes. A tab on a file is titled with its name.
   file?: { path: string; savedSql: string }
@@ -201,7 +204,7 @@ export const useTabs = create<TabsState>()((set) => ({
 
   openQuery: (paneId, sql) =>
     set((s) => {
-      const tab = newQueryTab(s, sql)
+      const tab = { ...newQueryTab(s, sql), ...(sql && { initialSql: sql }) }
       return {
         tabs: [...s.tabs, tab],
         queryCount: s.queryCount + 1,

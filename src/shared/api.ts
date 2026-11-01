@@ -65,6 +65,11 @@ export interface ConnectionsApi {
 export interface DialogApi {
   // Asks the user to pick a SQLite database file. Resolves to its path, or null if cancelled.
   openSqliteFile(): Promise<string | null>
+  // Asks the user to confirm something that can't be undone, in a native dialog whose default
+  // button is Cancel. Resolves to whether they chose `confirmLabel`.
+  confirm(message: string, detail: string, confirmLabel: string): Promise<boolean>
+  // Tells the user something failed, in a native dialog.
+  showError(message: string, detail: string): Promise<void>
 }
 
 // A .sql file and its text.

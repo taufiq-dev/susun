@@ -1,9 +1,14 @@
 import {
   ArrowLeftRight,
+  ChevronDown,
   ChevronRight,
+  ChevronsDownUp,
+  ChevronsUpDown,
   Columns2,
   Database,
+  Eye,
   FileCode,
+  Folder,
   FolderOpen,
   History,
   Link,
@@ -14,6 +19,7 @@ import {
   Plus,
   Power,
   RotateCw,
+  Table2,
   Trash2,
   X,
   type LucideIcon
@@ -37,6 +43,12 @@ function sized(Glyph: LucideIcon, size: number): () => React.JSX.Element {
 
 export const CloseIcon = sized(X, SMALL)
 export const ChevronRightIcon = sized(ChevronRight, SMALL)
+export const ChevronDownIcon = sized(ChevronDown, SMALL)
+// The tables list's tree: a schema (closed or open), a table, a view.
+export const SchemaIcon = sized(Folder, SMALL)
+export const SchemaOpenIcon = sized(FolderOpen, SMALL)
+export const TableIcon = sized(Table2, SMALL)
+export const ViewIcon = sized(Eye, SMALL)
 
 export const PlusIcon = sized(Plus, NORMAL)
 export const RefreshIcon = sized(RotateCw, NORMAL)
@@ -50,6 +62,8 @@ export const PencilIcon = sized(Pencil, NORMAL)
 export const SwitchIcon = sized(ArrowLeftRight, NORMAL)
 export const FolderOpenIcon = sized(FolderOpen, NORMAL)
 export const TrashIcon = sized(Trash2, NORMAL)
+export const CollapseAllIcon = sized(ChevronsDownUp, NORMAL)
+export const ExpandAllIcon = sized(ChevronsUpDown, NORMAL)
 
 export const TablesIcon = sized(Database, LARGE)
 export const SavedQueriesIcon = sized(FileCode, LARGE)

@@ -8,9 +8,10 @@ function connectionId(): string | null {
 }
 
 // Whether the tab has SQL that isn't saved: changed since it was read from or saved to its file,
-// or, for a tab not on a file, any SQL at all.
+// or, for a tab not on a file, any SQL other than what it was opened with.
 export function isDirty(tab: QueryTabState): boolean {
-  return tab.file ? tab.sql !== tab.file.savedSql : tab.sql.trim() !== ''
+  if (tab.file) return tab.sql !== tab.file.savedSql
+  return tab.sql.trim() !== '' && tab.sql !== tab.initialSql
 }
 
 // Saves the query tab's SQL to its file, or, for a tab not on one (or with `as`, Save As), to a

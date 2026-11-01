@@ -39,7 +39,10 @@ const api: Api = {
     remove: (id) => invoke('connections:remove', id)
   },
   dialog: {
-    openSqliteFile: () => invoke('dialog:openSqliteFile')
+    openSqliteFile: () => invoke('dialog:openSqliteFile'),
+    confirm: (message, detail, confirmLabel) =>
+      invoke('dialog:confirm', message, detail, confirmLabel),
+    showError: (message, detail) => invoke('dialog:showError', message, detail)
   },
   files: {
     openSql: (connectionId) => invoke('files:openSql', connectionId),

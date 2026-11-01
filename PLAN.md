@@ -347,6 +347,23 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     its submenu on hover and with Right and Left, Escape a level at a time, Disconnect; the Settings switch.
     All earlier tests pass. Once, choosing Maximize pane with Enter left the menu open on "Restore panes";
     it didn't happen again in four reruns and three focused attempts.
+  - [x] **Tables as a tree** (asked for after the hand cursor) — the Tables view has a header ("TABLES"
+    with the count, or "3/10" while filtering; Close all or Open all schemas; Reload) and a folder for each
+    Postgres schema, with its table count, which opens and closes; tables and views have their own icons.
+    Schemas start open and stay as the user leaves them; while filtering every match shows. MySQL and SQLite
+    tables have no schema, so they stay a flat list. It is an ARIA tree: Up and Down move, Right opens a
+    schema or steps into it, Left closes it or steps up to it, Enter opens a table or opens and closes a
+    schema; Down or Enter in the filter reaches the first row. Tested in the built app: the tree, closing
+    one schema and all of them, filtering into closed schemas, the keys, opening a table.
+  - [x] **A table's right-click menu** (asked for after the tree; the basic items first) — View data (a query
+    tab running `select * … limit 100`, until the table tab shows data in step 11), View structure, Copy
+    name, SQL: Select top 100 (the same, not run), Truncate… (tables only; a DELETE on SQLite) and Drop
+    table… or Drop view…, each after a native confirmation whose default is Cancel; a failure shows in a
+    native error dialog; dropping closes the table's tabs and reloads the list. `src/shared/sql.ts` quotes
+    names per database (unit tests). A query tab opened with SQL (here, or from history) isn't unsaved until
+    edited. Tested in the built app on Postgres and SQLite, on scratch tables: each item, Cancel and confirm,
+    Postgres refusing to truncate a referenced table, closing untouched tabs without a prompt. Not yet:
+    Rename, Duplicate, Hide, SQL: Create, Export and Import.
   - [ ] **10e. New Window** — opens another connect screen in a new window, from the File menu (the app menu
     now exists).
 - [ ] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with

@@ -175,6 +175,23 @@ const SQLITE_FILE_DIALOG: OpenDialogOptions = {
 }
 
 const dialogs: Handlers<DialogApi> = {
+  async confirm(event, message, detail, confirmLabel) {
+    // macOS lays the buttons out right to left, so the action is on the right there.
+    const buttons = [confirmLabel, 'Cancel']
+    const { response } = await messageBox(event, {
+      type: 'warning',
+      message,
+      detail,
+      buttons,
+      defaultId: 1,
+      cancelId: 1,
+      noLink: true
+    })
+    return response === 0
+  },
+  async showError(event, message, detail) {
+    await messageBox(event, { type: 'error', message, detail })
+  },
   async openSqliteFile(event) {
     const window = BrowserWindow.fromWebContents(event.sender)
     const { canceled, filePaths } = window
