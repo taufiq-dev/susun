@@ -89,7 +89,7 @@ export function ContextMenu({
       aria-label={label}
       onKeyDown={move}
       style={{ left, top, width: WIDTH }}
-      className="fixed z-50 rounded-[6px] border border-line bg-surface py-1 text-[13px] shadow-lg select-none"
+      className="fixed z-50 rounded-[6px] border border-line bg-surface py-1 text-[13px] shadow-lg select-none app-no-drag"
     >
       {items.map((item, i) =>
         item === 'separator' ? (

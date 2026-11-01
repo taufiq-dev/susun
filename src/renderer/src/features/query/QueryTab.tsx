@@ -3,12 +3,13 @@ import { closeCompletion } from '@codemirror/autocomplete'
 import CodeMirror, { Prec, keymap, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import type { DbType } from '@shared/types'
 import { Button } from '@renderer/components/ui'
+import { IS_MAC } from '@renderer/platform'
 import { useTabs, type QueryTabState } from '@renderer/store/tabs'
 import { editorLook, sqlLanguage, statementsToRun } from './editor'
 import { Results, RunStatus } from './Results'
 import { cancelRun, runQuery } from './run'
 
-const RUN_SHORTCUT = navigator.userAgent.includes('Mac') ? '⌘↵' : 'Ctrl+Enter'
+const RUN_SHORTCUT = IS_MAC ? '⌘↵' : 'Ctrl+Enter'
 
 const BASIC_SETUP = { foldGutter: false }
 

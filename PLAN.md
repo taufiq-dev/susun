@@ -255,8 +255,14 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     match (or, with several, goes to the first). A tab menu choice returns the focus to the tab before it
     runs, and Split, Move and Close then focus the pane they leave active, as Cmd+\ does. Tested in the
     built app with real key presses; the 10b, 10c and fixes 1-5 tests still pass.
-  - [ ] **Title bar in the theme** (asked for after the design fixes) — macOS can't recolour its title bar, so
-    hide it (`titleBarStyle: 'hidden'`) and put the traffic lights in Trowel's own top band.
+  - [x] **Title bar in the theme** (asked for after the design fixes) — macOS can't recolour its title bar, so
+    on macOS the window has none (`titleBarStyle: 'hidden'`) and the page's 40 px top band takes its place:
+    the workspace header, or on the connect screen the sidebar's name row and an empty band over the form.
+    The traffic lights sit at (14, 13) in its first 80 px; the band drags the window, and what's clickable
+    in it is marked no-drag. Windows and Linux keep their system title bar. Tested in the built app: no
+    title bar (content starts at the window's top), the bands' sizes and drag regions, the header's buttons
+    and the side panel's edge left clickable. Not checked by eye in the test, since the traffic lights
+    aren't in page screenshots. Not done: in macOS full screen the lights hide but the 80 px stays empty.
   - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
   - [ ] **10e. New Window** — opens another connect screen in a new window (a custom app menu, which also
     allows Cmd+W for tabs).

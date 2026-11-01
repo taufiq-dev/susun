@@ -21,6 +21,12 @@ function createWindow(): void {
     show: false,
     backgroundColor: windowBackground(),
     autoHideMenuBar: true,
+    // On macOS, no title bar of its own: the page's top band takes its place, in the app's colours,
+    // with the traffic lights centred in it (the band is 40px; see `frameless` in main.css). Elsewhere
+    // the system's title bar stays.
+    ...(process.platform === 'darwin'
+      ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 14, y: 13 } }
+      : {}),
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),

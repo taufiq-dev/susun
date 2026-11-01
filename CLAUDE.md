@@ -34,7 +34,7 @@ VS Code: the "Debug All" launch config debugs main and renderer together (render
 
 electron-vite builds three targets from `electron.vite.config.ts`, output to `out/main`, `out/preload`, `out/renderer`:
 
-- `src/main/` — Electron main process (Node). `index.ts` creates the `BrowserWindow`; it loads `ELECTRON_RENDERER_URL` in dev and `out/renderer/index.html` when built.
+- `src/main/` — Electron main process (Node). `index.ts` creates the `BrowserWindow`; it loads `ELECTRON_RENDERER_URL` in dev and `out/renderer/index.html` when built. Its background colour follows the OS theme, so a quick resize doesn't flash white. On macOS it has no title bar (`titleBarStyle: 'hidden'`): the page's 40px top band takes its place, with the traffic lights in its first 80px. In the renderer, `FRAMELESS` (`platform.ts`) and the `frameless:` variant (`main.css`) apply only then; the band drags the window (`app-drag`), and anything clickable in it needs `app-no-drag` or it gets no clicks.
 - `src/preload/` — runs before the page with `contextIsolation` on and `sandbox: false`. Exposes `window.electron` (the `@electron-toolkit/preload` wrapper, which can send on any IPC channel) and `window.api` (Trowel's own API, typed as `Api` in `src/shared/api.ts`; see below). Types for both live in `src/preload/index.d.ts`, which `tsconfig.web.json` includes so the renderer sees them.
 - `src/renderer/` — the React app. `index.html` sets a strict Content-Security-Policy (`script-src 'self'`, no remote connections), so inline scripts and remote resources are blocked until the CSP is changed. `@renderer` aliases `src/renderer/src` (renderer only).
 

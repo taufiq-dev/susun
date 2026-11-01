@@ -108,6 +108,20 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* On macOS the window has no title bar of its own (titleBarStyle 'hidden' in src/main/index.ts):
+   the page's 40px top band takes its place, so it matches the theme, with the traffic lights in its
+   first 80px. `frameless:` applies only then (main.tsx sets data-frameless on <html>). The band drags
+   the window (app-drag); anything clickable in it needs app-no-drag, or it gets no clicks. */
+@custom-variant frameless (&:where(:root[data-frameless] *));
+
+@utility app-drag {
+  -webkit-app-region: drag;
+}
+
+@utility app-no-drag {
+  -webkit-app-region: no-drag;
+}
+
 @utility focus-ring {
   &:focus-visible {
     outline: 2px solid var(--accent);

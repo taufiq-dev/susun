@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { panesOf } from '@renderer/store/panes'
+import { IS_MAC } from '@renderer/platform'
 import { focusedTab, useTabs } from '@renderer/store/tabs'
-
-const IS_MAC = navigator.userAgent.includes('Mac')
 
 // How menus and tooltips write the command key: "⌘\" on macOS, "Ctrl+\" elsewhere.
 export const MOD = IS_MAC ? '⌘' : 'Ctrl+'

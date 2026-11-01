@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ConnectionConfig, SavedConnection } from '@shared/types'
 import { MainArea, SidePanel } from '@renderer/components/SidePanel'
 import { Button, DbMark } from '@renderer/components/ui'
+import { FRAMELESS } from '@renderer/platform'
 import { useSession } from '@renderer/store/session'
 import { ConnectionFields } from './ConnectionFields'
 import { defaultName, describe, draftFromSaved, emptyDraft, toConfig, type Draft } from './draft'
@@ -128,8 +129,17 @@ export function ConnectScreen(): React.JSX.Element {
   return (
     <div className="flex h-full">
       <SidePanel id="connections" side="left" resizeLabel="Resize the saved connections list">
-        <h1 className="px-4 pt-4 pb-3 text-[15px] font-semibold">Trowel</h1>
-        <h2 className="px-4 pb-1.5 text-[12px] text-muted">Saved connections</h2>
+        {/* On macOS the name shares the window's top band with the traffic lights (frameless). */}
+        <h1
+          className={
+            FRAMELESS
+              ? 'flex h-10 shrink-0 items-center pr-4 pl-20 font-semibold app-drag'
+              : 'px-4 pt-4 pb-3 text-[15px] font-semibold'
+          }
+        >
+          Trowel
+        </h1>
+        <h2 className="px-4 pb-1.5 text-[12px] text-muted frameless:pt-2">Saved connections</h2>
         <div className="min-h-0 flex-1 overflow-y-auto">
           {listError && <p className="px-4 text-[12px] text-danger">{listError}</p>}
           {saved?.length === 0 && (
@@ -176,46 +186,54 @@ export function ConnectScreen(): React.JSX.Element {
         </div>
       </SidePanel>
 
-      <MainArea className="overflow-y-auto bg-surface">
-        <form
-          data-db={draft.type}
-          className="flex max-w-[560px] flex-col gap-6 px-10 py-8"
-          onSubmit={(e) => {
-            e.preventDefault()
-            void run('connect', () => connect(configOrThrow(), name))
-          }}
-        >
-          <h2 className="truncate text-[15px] font-semibold">
-            {draft.id ? draft.name || name : 'New connection'}
-          </h2>
+      <MainArea className="flex flex-col bg-surface">
+        {/* The rest of the top band, which drags the window like a title bar. */}
+        {FRAMELESS && <div className="h-10 shrink-0 app-drag" />}
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          <form
+            data-db={draft.type}
+            className="flex max-w-[560px] flex-col gap-6 px-10 py-8 frameless:pt-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void run('connect', () => connect(configOrThrow(), name))
+            }}
+          >
+            <h2 className="truncate text-[15px] font-semibold">
+              {draft.id ? draft.name || name : 'New connection'}
+            </h2>
 
-          <ConnectionFields draft={draft} namePlaceholder={name || 'My database'} onChange={edit} />
+            <ConnectionFields
+              draft={draft}
+              namePlaceholder={name || 'My database'}
+              onChange={edit}
+            />
 
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Button type="submit" variant="primary" disabled={busy !== null}>
-                Connect
-              </Button>
-              <Button onClick={() => void test()} disabled={busy !== null}>
-                Test connection
-              </Button>
-              <Button onClick={() => void save()} disabled={busy !== null}>
-                Save
-              </Button>
-              {draft.id && (
-                <Button
-                  variant="danger"
-                  className="ml-auto"
-                  onClick={remove}
-                  disabled={busy !== null}
-                >
-                  {confirmingDelete ? 'Click again to delete' : 'Delete'}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <Button type="submit" variant="primary" disabled={busy !== null}>
+                  Connect
                 </Button>
-              )}
+                <Button onClick={() => void test()} disabled={busy !== null}>
+                  Test connection
+                </Button>
+                <Button onClick={() => void save()} disabled={busy !== null}>
+                  Save
+                </Button>
+                {draft.id && (
+                  <Button
+                    variant="danger"
+                    className="ml-auto"
+                    onClick={remove}
+                    disabled={busy !== null}
+                  >
+                    {confirmingDelete ? 'Click again to delete' : 'Delete'}
+                  </Button>
+                )}
+              </div>
+              <StatusLine status={status} />
             </div>
-            <StatusLine status={status} />
-          </div>
-        </form>
+          </form>
+        </div>
       </MainArea>
     </div>
   )

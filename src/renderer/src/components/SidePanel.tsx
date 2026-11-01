@@ -111,7 +111,7 @@ export function SidePanel({
           resize(now + (e.key === grow ? KEY_STEP : -KEY_STEP), maxWidth(panel))
         }}
         // A strip 7px wide over the panel's border, reaching 3px past it on either side.
-        className={`focus-ring absolute inset-y-0 z-10 w-[7px] cursor-col-resize ${
+        className={`focus-ring absolute inset-y-0 z-10 w-[7px] cursor-col-resize app-no-drag ${
           side === 'left' ? '-right-[4px]' : '-left-[4px]'
         }`}
       />
