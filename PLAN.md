@@ -394,7 +394,15 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     either view. Tested in the built app on Postgres, MySQL and SQLite with 250-row scratch tables: pages 1
     to 3 and back, sorting by a column both ways (the whole table's order, not one page's) and its second
     page, counting, a table without a primary key, the tab keeping its page and order, Structure and back.
-  - [ ] **11b. Filter** — a column, an operator and a value, as a parameterized `WHERE`.
+  - [x] **11b. Filter** — a bar above the rows: a column, an operator (=, ≠, <, >, ≤, ≥, contains, starts with,
+    is null, is not null) and a value, applied with Enter or Apply (back to page 1), and Clear. The value is
+    a parameter; contains and starts with compare the column as text, case-insensitively (`ilike` on
+    Postgres), with `%` and `_` in the value matching literally (escaped with `!`, which every database
+    takes). Count rows counts with the filter. The column and operator pickers are shadcn's Select, opening
+    as a list below (not macOS-style over the trigger, which near the window's top pushed the first options
+    off screen). Tested in the built app on Postgres, MySQL and SQLite: each kind of operator, a filter over
+    two pages and sorted, `%_` matching only `50%_off`, case, NULLs, a quote-laden value matching nothing,
+    the no-rows message, Clear.
   - [ ] **11c. Edits** — edit cells, set NULL, save the changed rows in one transaction on a session of its
     own, or discard; tables without a primary key, and views, stay read-only.
 - [ ] **12. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`

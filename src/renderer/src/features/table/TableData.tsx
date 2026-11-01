@@ -7,6 +7,7 @@ import { DEFAULT_COL_DEF, formatCell, gridTheme, sizeColumns } from '@renderer/c
 import { NextIcon, PreviousIcon, RefreshIcon } from '@renderer/components/icons'
 import { IconButton } from '@renderer/components/ui'
 import { useTabs, type TableTabState } from '@renderer/store/tabs'
+import { FilterBar } from './FilterBar'
 
 // Rows a page shows. One more is asked for, to tell whether there's a next page.
 const PAGE_SIZE = 100
@@ -125,8 +126,15 @@ export function TableData({
   const first = tab.page * PAGE_SIZE
   const total = count?.request === countRequest ? count.value : null
 
+  const filterColumns = columns?.length ? columns.map((c) => c.name) : (shown?.columns ?? [])
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <FilterBar
+        columns={filterColumns}
+        filter={tab.filter}
+        onApply={(filter) => updateTable(tab.id, { filter, page: 0 })}
+      />
       <div className="min-h-0 flex-1">
         {page && 'error' in page && page.request === request ? (
           <div className="h-full overflow-auto px-4 py-3">
