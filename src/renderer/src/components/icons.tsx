@@ -59,3 +59,19 @@ export function SplitRightIcon(): React.JSX.Element {
     </Icon>
   )
 }
+
+export function MaximizeIcon(): React.JSX.Element {
+  return (
+    <Icon>
+      <path d="M9.5 2.5h4v4M6.5 13.5h-4v-4M13.5 2.5 9 7M2.5 13.5 7 9" />
+    </Icon>
+  )
+}
+
+export function RestoreIcon(): React.JSX.Element {
+  return (
+    <Icon>
+      <path d="M13.5 6.5h-4v-4M2.5 9.5h4v4M9.5 6.5 14 2M6.5 9.5 2 14" />
+    </Icon>
+  )
+}

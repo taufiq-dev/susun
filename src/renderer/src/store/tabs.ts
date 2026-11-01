@@ -72,6 +72,10 @@ interface TabsState {
   // The pane that New query and the sidebar open tabs in, and whose active tab the sidebar
   // highlights. Clicking in a pane focuses it.
   focusedPaneId: string
+  // The pane filling the tab area, the others hidden, if one is maximized. It is always the focused
+  // pane: focusing another (or closing it, or splitting, which focuses the new pane) restores the
+  // layout. Kept so by a subscriber.
+  maximizedPaneId: string | null
   // Numbers new query tabs: "Query 1", "Query 2", ...
   queryCount: number
   // The editor share a new query tab starts with: the last one set.
@@ -91,6 +95,9 @@ interface TabsState {
   // Moves the tab into a new pane on `side` of its pane, unless it is the pane's only tab.
   moveToNewPane(tabId: string, side: Side): void
   resize(splitId: string, sizes: number[]): void
+  // Maximizes the pane and focuses it, or restores the layout if it is maximized. Does nothing while
+  // there is only one pane.
+  toggleMaximize(paneId: string): void
   setSql(id: string, sql: string): void
   setEditorFraction(id: string, fraction: number): void
   // These do nothing if the tab has been closed.
@@ -116,9 +123,9 @@ export function focusedTab(s: TabsState): Tab | undefined {
 
 type Layout = Pick<TabsState, 'root' | 'focusedPaneId'>
 
-function initial(): Pick<TabsState, 'tabs' | 'queryCount'> & Layout {
+function initial(): Pick<TabsState, 'tabs' | 'queryCount' | 'maximizedPaneId'> & Layout {
   const pane = newPane()
-  return { tabs: [], root: pane, focusedPaneId: pane.id, queryCount: 0 }
+  return { tabs: [], root: pane, focusedPaneId: pane.id, maximizedPaneId: null, queryCount: 0 }
 }
 
 // The pane to open a tab in: the given one, or else the focused one.
@@ -258,6 +265,15 @@ export const useTabs = create<TabsState>()((set) => ({
 
   resize: (splitId, sizes) => set((s) => ({ root: resizeSplit(s.root, splitId, sizes) })),
 
+  toggleMaximize: (paneId) =>
+    set((s) => {
+      if (s.root.type === 'pane' || !findPane(s.root, paneId)) return s
+      return {
+        maximizedPaneId: s.maximizedPaneId === paneId ? null : paneId,
+        focusedPaneId: paneId
+      }
+    }),
+
   setSql: (id, sql) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, sql }))),
 
   setEditorFraction: (id, fraction) =>
@@ -275,3 +291,10 @@ export const useTabs = create<TabsState>()((set) => ({
 
   reset: () => set(initial())
 }))
+
+useTabs.subscribe((s) => {
+  if (s.maximizedPaneId === null) return
+  if (s.maximizedPaneId !== s.focusedPaneId || s.root.type === 'pane') {
+    useTabs.setState({ maximizedPaneId: null })
+  }
+})

@@ -1,6 +1,12 @@
 import { useCallback, useState } from 'react'
 import { ContextMenu, type MenuEntry } from '@renderer/components/ContextMenu'
-import { CloseIcon, PlusIcon, SplitRightIcon } from '@renderer/components/icons'
+import {
+  CloseIcon,
+  MaximizeIcon,
+  PlusIcon,
+  RestoreIcon,
+  SplitRightIcon
+} from '@renderer/components/icons'
 import { IconButton } from '@renderer/components/ui'
 import { endSession } from '@renderer/features/query/run'
 import type { Pane } from '@renderer/store/panes'
@@ -30,6 +36,10 @@ export function TabBar({
   const openQuery = useTabs((s) => s.openQuery)
   const split = useTabs((s) => s.split)
   const moveToNewPane = useTabs((s) => s.moveToNewPane)
+  const toggleMaximize = useTabs((s) => s.toggleMaximize)
+  // Maximizing needs another pane to hide.
+  const several = useTabs((s) => s.root.type === 'split')
+  const maximized = useTabs((s) => s.maximizedPaneId === pane.id)
   const connectionId = useSession((s) => s.session?.connectionId)
   const [menu, setMenu] = useState<{ x: number; y: number; tab: Tab } | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
@@ -54,6 +64,12 @@ export function TabBar({
         label: 'Move to a new pane below',
         disabled: alone,
         onSelect: () => moveToNewPane(tab.id, 'down')
+      },
+      'separator',
+      {
+        label: maximized ? 'Restore panes' : 'Maximize pane',
+        disabled: !several,
+        onSelect: () => toggleMaximize(pane.id)
       },
       'separator',
       { label: 'Close', onSelect: () => close(tab.id) }
@@ -83,6 +99,8 @@ export function TabBar({
                 aria-selected={selected}
                 title={tabTitle(tab)}
                 onClick={() => activate(tab.id)}
+                // Double-click maximizes the pane, or restores the layout, as in VS Code.
+                onDoubleClick={() => several && toggleMaximize(pane.id)}
                 // Middle-click closes, as in a browser.
                 onAuxClick={(e) => {
                   if (e.button === 1) close(tab.id)
@@ -110,12 +128,27 @@ export function TabBar({
       <IconButton label="New query" onClick={() => openQuery(pane.id)} className="m-1">
         <PlusIcon />
       </IconButton>
+      {several && (
+        <IconButton
+          label={maximized ? 'Restore panes' : 'Maximize pane'}
+          title={
+            maximized
+              ? 'Restore panes (or double-click a tab)'
+              : 'Maximize this pane (or double-click a tab)'
+          }
+          aria-pressed={maximized}
+          onClick={() => toggleMaximize(pane.id)}
+          className="my-1 ml-auto"
+        >
+          {maximized ? <RestoreIcon /> : <MaximizeIcon />}
+        </IconButton>
+      )}
       <IconButton
         label="Split right"
         title={`Split right (${MOD}\\). Alt-click to split down.`}
         disabled={!active}
         onClick={(e) => active && split(active.id, e.altKey ? 'down' : 'right')}
-        className="my-1 mr-1 ml-auto"
+        className={`my-1 mr-1 ${several ? '' : 'ml-auto'}`}
       >
         <SplitRightIcon />
       </IconButton>

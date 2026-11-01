@@ -29,6 +29,11 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 - **One connection per window.** Panes split the tabs of the window's connection; a New Window command opens
   another connection beside it. Tabs record their connection, so mixing connections in one window could be
   added later (the sidebar, the session store and the accent would need to know about several).
+- **Results stay under each query tab's editor**, not in one panel shared by all panes. A shared panel was
+  built and dropped before committing: it gave results the full width, but showed one result at a time (so
+  two queries side by side couldn't be compared, which is much of the point of split panes), put results
+  away from the query that made them, and redrew the grid on each switch. DataGrip, DBeaver and TablePlus
+  also keep results with their editor. For room, a pane can be maximized instead (step 10c).
 
 - **No Beekeeper Studio code.** None of it is copied or ported, GPLv3 or commercial. The clone is only for
   seeing how it approaches a problem.
@@ -201,10 +206,18 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     moved to a new pane finished there, `Cmd+1`/`Cmd+3`/`Cmd+\`, dragging and arrow keys on a splitter,
     closing a pane's only tab (its session closed too), and disconnecting back to one empty pane; the tree
     functions have 11 unit tests. The 10a session tests and the 9a query tests still pass.
-  - [ ] **10c. One results panel** — the user's choice: the results move out of each query tab into one panel
-    across the bottom of the tab area, showing the results of the focused pane's query tab (with its name, so
-    it's clear whose they are); Run, Cancel and the status stay under each editor. Two results can't be seen
-    at once.
+  - [x] **10c. Maximize a pane** — as in VS Code: a pane fills the tab area until restored (a tab bar button
+    shown when there are several panes, double-clicking a tab, or the tab menu). The other panes stay
+    mounted but hidden, so their editors and grids keep their state. Focusing another pane, splitting, or
+    closing the pane restores the layout. No keyboard shortcut yet (VS Code's is the chord Cmd+K Cmd+M).
+    Also fixes a 10b bug found while testing it: a pane whose place in the tree changed (the pane being
+    split, which moves into a new split) was remounted, losing its editor's undo history and cursor and its
+    grid's scroll. Panes are now one flat list keyed by id, absolutely positioned from the tree, so they
+    never remount. Tested in the built app: the maximized pane filled the tab area (752x728) with the others
+    hidden and no splitters; the grid kept its scroll and the editors their undo history (Cmd+Z after a
+    split and after maximizing undid an earlier edit); the button, double-click and menu item toggle it;
+    Cmd+3, splitting and closing the maximized pane's last tab restored the layout; with one pane the
+    button is hidden and the menu item disabled. The 10a, 10b and step 9 tests still pass.
   - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
   - [ ] **10e. New Window** — opens another connect screen in a new window (a custom app menu, which also
     allows Cmd+W for tabs).
