@@ -92,6 +92,18 @@
   ::selection {
     background: color-mix(in srgb, var(--accent) 30%, transparent);
   }
+
+  /* Anything clickable shows the hand cursor (Tailwind v4 leaves buttons on the arrow). Disabled
+     controls keep the arrow; resize handles and text fields set their own cursors. */
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']),
+  [role='tab']:not([aria-disabled='true']),
+  [role='switch']:not([aria-disabled='true']):not([data-disabled]),
+  [role='menuitem']:not([aria-disabled='true']):not([data-disabled]),
+  [role='option']:not([aria-disabled='true']),
+  label:has(input[type='radio']:not(:disabled), input[type='checkbox']:not(:disabled)) {
+    cursor: pointer;
+  }
 }
 
 @layer components {
