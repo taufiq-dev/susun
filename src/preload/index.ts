@@ -28,6 +28,7 @@ const api: Api = {
     disconnect: (connectionId) => invoke('db:disconnect', connectionId),
     openSession: (connectionId) => invoke('db:openSession', connectionId),
     closeSession: (sessionId) => invoke('db:closeSession', sessionId),
+    applyChanges: (connectionId, statements) => invoke('db:applyChanges', connectionId, statements),
     listTables: (connectionId) => invoke('db:listTables', connectionId),
     listColumns: (connectionId, table) => invoke('db:listColumns', connectionId, table),
     query: (sessionId, sql, params) => invoke('db:query', sessionId, sql, params),

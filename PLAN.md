@@ -378,7 +378,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     Rename, Duplicate, Hide, SQL: Create, Export and Import.
   - [ ] **10e. New Window** — opens another connect screen in a new window, from the File menu (the app menu
     now exists).
-- [ ] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
+- [x] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a
   primary key are read-only. Table tabs share the connection's own session, so a save's transaction must not
@@ -403,8 +403,24 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     off screen). Tested in the built app on Postgres, MySQL and SQLite: each kind of operator, a filter over
     two pages and sorted, `%_` matching only `50%_off`, case, NULLs, a quote-laden value matching nothing,
     the no-rows message, Clear.
-  - [ ] **11c. Edits** — edit cells, set NULL, save the changed rows in one transaction on a session of its
-    own, or discard; tables without a primary key, and views, stay read-only.
+  - [x] **11c. Edits** — in a table with a primary key, a cell edits on double-click, Enter or typing; its
+    right-click menu copies it, sets it to NULL (not for a NOT NULL column) or undoes its change. Changes are
+    kept in the tab by row key (`edits`: the key as read and the new values), so they outlast paging,
+    sorting, filtering and switching tabs; changed cells are tinted, and an edit back to the value read is
+    no change. Save sends one parameterized `UPDATE … WHERE <key>` per row (`updateRowSql`) to
+    `api.db.applyChanges`, which runs them in one transaction on a session of its own (other tabs' queries on
+    the connection's own session can't interleave), each having to change exactly one row: a row changed or
+    deleted meanwhile, or a statement the database refuses, rolls all of it back, and the error dialog says
+    which row; the changes stay. Discard drops them. A tab with changes is unsaved like a query tab with
+    unsaved SQL: it shows the dot, and closing it, disconnecting or quitting asks, Save applying them.
+    Tables without a primary key, and views, are read-only and say so. Values are edited as text (JSON as
+    its text; bytes aren't editable) and sent as text for the database to convert. Tested in the built app on
+    Postgres, MySQL and SQLite: editing, an edit back to the original, Set to NULL, Undo, changes kept
+    across tabs, Save and the values in the database, a row deleted meanwhile, a CHECK violation rolling
+    back the row before it, Discard, a table without a key and a view, the close prompt's Save. Found and
+    fixed while testing: a save whose error dialog failed left the footer on "Saving…".
+    Not yet: inserting and deleting rows; editing a cell to an empty string when it was NULL (an untouched
+    editor keeps NULL).
 - [ ] **12. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`
   (folding included), plus a key filter box. Build the row object from `columns` (suffix repeated names, e.g.
   `id`, `id_2`). Convert first: `Uint8Array` → hex, Postgres `bigint` arrives as a

@@ -17,11 +17,10 @@ import {
 } from '@renderer/components/shadcn/context-menu'
 import { IconButton } from '@renderer/components/ui'
 import { useRevealSelected } from '@renderer/components/useRevealSelected'
-import { isDirty } from '@renderer/features/query/files'
 import type { Pane } from '@renderer/store/panes'
 import { useSession } from '@renderer/store/session'
 import { useTabs, type Tab } from '@renderer/store/tabs'
-import { closeTab } from './closing'
+import { closeTab, isUnsaved } from './closing'
 import { MOD, focusPaneContent } from './shortcuts'
 
 // Once a tab closed from the keyboard is gone: focuses the tab now active in its pane, or the
@@ -143,8 +142,8 @@ export function TabBar({
       >
         {tabs.map((tab) => {
           const selected = tab.id === pane.activeId
-          // Unsaved SQL shows as a dot where the close button is, until the tab is hovered.
-          const dirty = tab.type === 'query' && isDirty(tab)
+          // Unsaved SQL or rows show as a dot where the close button is, until the tab is hovered.
+          const dirty = isUnsaved(tab)
           return (
             <ContextMenu key={tab.id}>
               <ContextMenuTrigger

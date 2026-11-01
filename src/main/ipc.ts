@@ -151,6 +151,35 @@ const db: Handlers<DbApi> = {
     return id
   },
   closeSession: (_event, sessionId) => closeSession(sessionId),
+  async applyChanges(_event, connectionId, statements) {
+    const open = openConnections.get(connectionId)
+    if (!open) throw new Error('Connection is closed')
+    // An in-memory SQLite database exists only in the connection's own session.
+    const shared = open.config.type === 'sqlite' && open.config.file === ':memory:'
+    const client = shared ? open.client : createClient(open.config)
+    if (!shared) await client.connect()
+    try {
+      await client.query('begin')
+      for (const [i, { sql, params }] of statements.entries()) {
+        const { rowCount } = await client.query(sql, params).catch((err: Error) => {
+          throw new Error(`Row ${i + 1}: ${errorMessage(err)}`)
+        })
+        if (rowCount !== 1) {
+          throw new Error(
+            rowCount === 0
+              ? `Row ${i + 1} wasn’t found: it may have been changed or deleted since it was read.`
+              : `Row ${i + 1}: its key matched ${rowCount} rows.`
+          )
+        }
+      }
+      await client.query('commit')
+    } catch (err) {
+      await client.query('rollback').catch(() => {})
+      throw err
+    } finally {
+      if (!shared) await client.disconnect().catch(() => {})
+    }
+  },
   listTables: (_event, connectionId) => client(connectionId).listTables(),
   listColumns: (_event, connectionId, table) => client(connectionId).listColumns(table),
   query: (_event, sessionId, sql, params) => client(sessionId).query(sql, params),

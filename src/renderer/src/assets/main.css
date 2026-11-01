@@ -120,6 +120,11 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* A table tab's changed cell, not saved yet. */
+.ag-root-wrapper .ag-cell.cell-changed {
+  background: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
 /* On macOS the window has no title bar of its own (titleBarStyle 'hidden' in src/main/index.ts):
    the page's 40px top band takes its place, so it matches the theme, with the traffic lights in its
    first 80px. `frameless:` applies only then (main.tsx sets data-frameless on <html>). The band drags

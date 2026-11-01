@@ -11,6 +11,7 @@ import type {
   TableInfo,
   TableRef
 } from './types'
+import type { Parameterized } from './sql'
 
 // What preload exposes as `window.api`. Each method is an `ipcMain.handle` channel named
 // `<group>:<method>`, so `api.db.query` is `db:query`. The exceptions are the `on...` methods of
@@ -46,6 +47,10 @@ export interface DbApi {
   listColumns(connectionId: string, table: TableRef): Promise<ColumnInfo[]>
   // `sessionId` is from `openSession`, or a connection id for the connection's own session.
   query(sessionId: string, sql: string, params?: unknown[]): Promise<QueryResult>
+  // Runs the UPDATEs in one transaction on a session of its own (so other tabs' queries on the
+  // connection's own session can't run inside it), each of which must change exactly one row;
+  // otherwise all of it is rolled back, and this rejects, saying which statement (from 1) failed.
+  applyChanges(connectionId: string, statements: Parameterized[]): Promise<void>
   // Stops the query running in the session, which then rejects. Does nothing if none is running or
   // the session is closed. On SQLite this reopens the database, which loses the session's state
   // (an open transaction, temp tables, attached databases, settings).

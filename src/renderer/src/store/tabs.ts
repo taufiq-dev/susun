@@ -76,12 +76,24 @@ export interface TableTabState {
   page: number
   order?: Order
   filter?: Filter
+  // Changed cells not saved yet, by row (the row's key values as JSON). They outlast paging,
+  // sorting and filtering, since a row is found by its primary key, not its place.
+  edits?: Record<string, RowEdit>
+}
+
+// A row's unsaved changes: its primary key as read, which the UPDATE finds it by, and the new values
+// by column (a string as typed, or null for NULL).
+export interface RowEdit {
+  key: { column: string; value: unknown }[]
+  changes: Record<string, string | null>
 }
 
 export type TableView = 'data' | 'structure'
 
 // What the table tab can change about itself.
-export type TableTabChanges = Partial<Pick<TableTabState, 'view' | 'page' | 'order' | 'filter'>>
+export type TableTabChanges = Partial<
+  Pick<TableTabState, 'view' | 'page' | 'order' | 'filter' | 'edits'>
+>
 
 export type Tab = QueryTabState | TableTabState
 
@@ -311,7 +323,8 @@ export const useTabs = create<TabsState>()((set) => ({
               ...newQueryTab(s, tab.sql, tab.editorFraction),
               ...(tab.file && { title: tab.title, file: tab.file })
             }
-          : { ...tab, id: crypto.randomUUID() }
+          : // The copy shows the same table, without the original's unsaved changes.
+            { ...tab, id: crypto.randomUUID(), edits: undefined }
       const target = newPane([copy.id])
       return {
         tabs: [...s.tabs, copy],
