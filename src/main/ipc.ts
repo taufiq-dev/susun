@@ -17,14 +17,26 @@ import type {
   DbApi,
   DialogApi,
   FilesApi,
+  HistoryApi,
   IpcResult,
   SaveChoice,
-  SettingsApi
+  SettingsApi,
+  SqlFile
 } from '@shared/api'
 import type { ConnectionConfig } from '@shared/types'
-import { listConnections, removeConnection, saveConnection } from './connections'
+import { listConnections, markUsed, removeConnection, saveConnection } from './connections'
 import { createClient, type DbClient } from './db'
 import { errorMessage } from './db/errors'
+import {
+  addHistory,
+  clearHistory,
+  connectionKey,
+  forgetFile,
+  hasFile,
+  listFiles,
+  listHistory,
+  rememberFile
+} from './library'
 import { getSettings, setSettings } from './settings'
 import { allowClose, closingToQuit } from './windows'
 
@@ -40,6 +52,8 @@ type Handlers<T> = {
 // and table tabs use) and the ids of the sessions opened on it, which query tabs use.
 interface OpenConnection {
   config: ConnectionConfig
+  // What its query files and history are filed under (library.ts).
+  key: string
   client: DbClient
   owner: WebContents
   sessions: Set<string>
@@ -57,6 +71,13 @@ const watchedOwners = new WeakSet<WebContents>()
 // The client of a session, or of a connection's own session.
 function findClient(id: string): DbClient | undefined {
   return openSessions.get(id)?.client ?? openConnections.get(id)?.client
+}
+
+// The library key of an open connection.
+function keyOf(connectionId: string): string {
+  const open = openConnections.get(connectionId)
+  if (!open) throw new Error('Connection is closed')
+  return open.key
 }
 
 function client(id: string): DbClient {
@@ -101,11 +122,13 @@ function watchOwner(owner: WebContents): void {
 }
 
 const db: Handlers<DbApi> = {
-  async connect(event, config) {
+  async connect(event, config, savedId) {
     const client = createClient(config)
     await client.connect()
     const id = randomUUID()
-    openConnections.set(id, { config, client, owner: event.sender, sessions: new Set() })
+    const key = connectionKey(config, savedId)
+    openConnections.set(id, { config, key, client, owner: event.sender, sessions: new Set() })
+    if (savedId) markUsed(savedId)
     watchOwner(event.sender)
     return id
   },
@@ -188,8 +211,31 @@ const SQL_FILTERS = [
 // Larger files would make the editor slow to the point of hanging.
 const MAX_SQL_BYTES = 20 * 1024 * 1024
 
+// Reads a .sql file for a query tab, letting the window save to it and putting it on the
+// connection's list. Resolves to null, having told the user why, if that fails.
+async function readQueryFile(
+  event: IpcMainInvokeEvent,
+  path: string,
+  connectionId: string | null
+): Promise<SqlFile | null> {
+  try {
+    if ((await stat(path)).size > MAX_SQL_BYTES) throw new Error('The file is over 20 MB.')
+    const sql = await readFile(path, 'utf8')
+    pick(event.sender, path)
+    if (connectionId) rememberFile(keyOf(connectionId), path)
+    return { path, sql }
+  } catch (err) {
+    await messageBox(event, {
+      type: 'error',
+      message: `Couldn’t open “${basename(path)}”`,
+      detail: errorMessage(err)
+    })
+    return null
+  }
+}
+
 const files: Handlers<FilesApi> = {
-  async openSql(event) {
+  async openSql(event, connectionId) {
     const window = BrowserWindow.fromWebContents(event.sender)
     const options: OpenDialogOptions = {
       title: 'Open query',
@@ -201,22 +247,16 @@ const files: Handlers<FilesApi> = {
       : await dialog.showOpenDialog(options)
     const path = filePaths[0]
     if (canceled || !path) return null
-    try {
-      if ((await stat(path)).size > MAX_SQL_BYTES) throw new Error('The file is over 20 MB.')
-      const sql = await readFile(path, 'utf8')
-      pick(event.sender, path)
-      return { path, sql }
-    } catch (err) {
-      await messageBox(event, {
-        type: 'error',
-        message: `Couldn’t open “${basename(path)}”`,
-        detail: errorMessage(err)
-      })
-      return null
-    }
+    return readQueryFile(event, path, connectionId)
   },
 
-  async saveSql(event, sql, path, name) {
+  async readSql(event, connectionId, path) {
+    if (!hasFile(keyOf(connectionId), path))
+      throw new Error('That file isn’t on this connection’s list')
+    return readQueryFile(event, path, connectionId)
+  },
+
+  async saveSql(event, sql, path, name, connectionId) {
     if (path && !pickedFiles.get(event.sender)?.has(path)) {
       throw new Error('That file wasn’t opened or saved in this window')
     }
@@ -245,8 +285,18 @@ const files: Handlers<FilesApi> = {
       return null
     }
     pick(event.sender, target)
+    if (connectionId) rememberFile(keyOf(connectionId), target)
     return target
-  }
+  },
+
+  list: (_event, connectionId) => listFiles(keyOf(connectionId)),
+  forget: async (_event, connectionId, path) => forgetFile(keyOf(connectionId), path)
+}
+
+const history: Handlers<HistoryApi> = {
+  list: async (_event, connectionId) => listHistory(keyOf(connectionId)),
+  add: async (_event, connectionId, entry) => addHistory(keyOf(connectionId), entry),
+  clear: async (_event, connectionId) => clearHistory(keyOf(connectionId))
 }
 
 const settings: Handlers<SettingsApi> = {
@@ -267,11 +317,13 @@ const appHandlers: Handlers<AppHandlersApi> = {
     const when =
       reason === 'disconnect'
         ? ' before disconnecting'
-        : reason === 'close-window'
-          ? closingToQuit(event.sender)
-            ? ' before quitting'
-            : ' before closing the window'
-          : ''
+        : reason === 'switch'
+          ? ' before switching connections'
+          : reason === 'close-window'
+            ? closingToQuit(event.sender)
+              ? ' before quitting'
+              : ' before closing the window'
+            : ''
     const list = one ? '' : `${titles.map((t) => `• ${t}`).join('\n')}\n\n`
     // macOS lays the buttons out right to left: Save on the right, Don't Save on the far left.
     const save = one ? 'Save' : 'Save All'
@@ -314,6 +366,7 @@ export function registerIpc(): void {
   handle<ConnectionsApi>('connections', connections)
   handle<DialogApi>('dialog', dialogs)
   handle<FilesApi>('files', files)
+  handle<HistoryApi>('history', history)
   handle<SettingsApi>('settings', settings)
   handle<AppHandlersApi>('app', appHandlers)
 }

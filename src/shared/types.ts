@@ -36,6 +36,8 @@ export interface SavedConnection {
   id: string
   name: string
   config: ConnectionConfig
+  // When it was last connected to, in ms since the epoch, if ever.
+  lastUsedAt?: number
 }
 
 // What `api.connections.save` takes: without an `id` it adds a connection, with one it replaces
@@ -93,4 +95,27 @@ export interface Settings {
 
 export const DEFAULT_SETTINGS: Settings = {
   askToSaveQueries: true
+}
+
+// A run in a connection's history: the SQL run (the selection, or the whole editor) and how it went.
+export interface HistoryEntry {
+  id: number
+  sql: string
+  // When it ran, in ms since the epoch.
+  ranAt: number
+  durationMs: number
+  status: 'done' | 'failed' | 'cancelled'
+  // e.g. "40 rows", "3 statements", or the error.
+  summary: string
+}
+
+export type NewHistoryEntry = Omit<HistoryEntry, 'id' | 'ranAt'>
+
+// A .sql file saved or opened while connected to a connection.
+export interface QueryFileEntry {
+  path: string
+  // When it was last saved or opened, in ms since the epoch.
+  usedAt: number
+  // It's no longer there (moved, renamed or deleted).
+  missing: boolean
 }

@@ -32,12 +32,24 @@ const STATUS_COLOURS: Record<Status['kind'], string> = {
 export function ConnectScreen(): React.JSX.Element {
   const [saved, setSaved] = useState<SavedConnection[] | null>(null)
   const [listError, setListError] = useState<string | null>(null)
-  const [draft, setDraft] = useState<Draft>(emptyDraft)
+  // After Edit Connection, or a failed switch, it opens on that connection's form.
+  const [draft, setDraft] = useState<Draft>(() => {
+    const returnTo = useSession.getState().returnTo
+    return returnTo ? draftFromSaved(returnTo.connection) : emptyDraft()
+  })
   const [busy, setBusy] = useState<Busy | null>(null)
-  const [status, setStatus] = useState<Status | null>(null)
+  const [status, setStatus] = useState<Status | null>(() => {
+    const error = useSession.getState().returnTo?.error
+    return error ? { kind: 'error', text: error } : null
+  })
   const [confirmingDelete, setConfirmingDelete] = useState(false)
   const [listVersion, setListVersion] = useState(0)
   const openSession = useSession((s) => s.open)
+
+  // The form and status above have taken it.
+  useEffect(() => {
+    useSession.setState({ returnTo: null })
+  }, [])
 
   // Loads the saved list, and loads it again whenever a save or delete bumps listVersion.
   useEffect(() => {
@@ -85,9 +97,20 @@ export function ConnectScreen(): React.JSX.Element {
     return parsed.config
   }
 
-  const connect = async (config: ConnectionConfig, connectionName: string): Promise<void> => {
-    const connectionId = await window.api.db.connect(config)
-    openSession({ connectionId, name: connectionName, type: config.type, detail: describe(config) })
+  const connect = async (
+    config: ConnectionConfig,
+    connectionName: string,
+    savedId: string | undefined
+  ): Promise<void> => {
+    const connectionId = await window.api.db.connect(config, savedId)
+    openSession({
+      connectionId,
+      name: connectionName,
+      type: config.type,
+      detail: describe(config),
+      config,
+      savedId
+    })
   }
 
   const test = (): Promise<void> =>
@@ -159,7 +182,7 @@ export function ConnectScreen(): React.JSX.Element {
                     aria-current={selected || undefined}
                     title="Double-click to connect"
                     onClick={() => edit(draftFromSaved(c))}
-                    onDoubleClick={() => void run('connect', () => connect(c.config, c.name))}
+                    onDoubleClick={() => void run('connect', () => connect(c.config, c.name, c.id))}
                     className={`focus-ring flex w-full items-start gap-2.5 px-4 py-1.5 text-left ${
                       selected
                         ? 'bg-surface shadow-[inset_2px_0_0_var(--accent)]'
@@ -195,7 +218,7 @@ export function ConnectScreen(): React.JSX.Element {
             className="flex max-w-[560px] flex-col gap-6 px-10 py-8 frameless:pt-2"
             onSubmit={(e) => {
               e.preventDefault()
-              void run('connect', () => connect(configOrThrow(), name))
+              void run('connect', () => connect(configOrThrow(), name, draft.id))
             }}
           >
             <h2 className="truncate text-[15px] font-semibold">

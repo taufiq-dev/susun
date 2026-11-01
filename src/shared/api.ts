@@ -1,6 +1,9 @@
 import type {
   ColumnInfo,
   ConnectionConfig,
+  HistoryEntry,
+  NewHistoryEntry,
+  QueryFileEntry,
   QueryResult,
   SavedConnection,
   SavedConnectionInput,
@@ -17,6 +20,7 @@ export interface Api {
   connections: ConnectionsApi
   dialog: DialogApi
   files: FilesApi
+  history: HistoryApi
   settings: SettingsApi
   app: AppApi
 }
@@ -25,8 +29,10 @@ export interface Api {
 // A session is one database connection (on SQLite, one process), so the queries of different
 // sessions run side by side, and each has its own transactions, temp tables and settings.
 export interface DbApi {
-  // Opens a connection and returns its id. Closing or reloading the window closes it.
-  connect(config: ConnectionConfig): Promise<string>
+  // Opens a connection and returns its id. Closing or reloading the window closes it. `savedId` is
+  // the saved connection it is, if any, which marks it as just used, and files the connection's
+  // query files and history under it (rather than under its address).
+  connect(config: ConnectionConfig, savedId?: string): Promise<string>
   // Closes the connection and its sessions.
   disconnect(connectionId: string): Promise<void>
   // Opens another session on the connection and returns its id. Each query tab has one. An
@@ -68,14 +74,35 @@ export interface SqlFile {
 }
 
 // Query tabs' .sql files. A window can only write to files the user picked in its Open or Save
-// dialogs, so a page can't write wherever it likes.
+// dialogs, or opened from a connection's list, so a page can't write wherever it likes. A file
+// opened or saved while connected (given a `connectionId`) goes on that connection's list.
 export interface FilesApi {
-  // Asks the user for a .sql file to open. Resolves to it, or null if cancelled.
-  openSql(): Promise<SqlFile | null>
+  // Asks the user for a .sql file to open. Resolves to it, or null if cancelled or reading failed
+  // (the user is told why in a dialog).
+  openSql(connectionId: string | null): Promise<SqlFile | null>
+  // Reads a file on the connection's list. Resolves to null if reading failed (the user is told).
+  readSql(connectionId: string, path: string): Promise<SqlFile | null>
   // Writes the SQL to `path` (a file this window opened or saved), or with no path first asks where
   // to save it, suggesting `name`. Resolves to the path written, or null if the user cancelled or
   // writing failed (the user is told why in a dialog).
-  saveSql(sql: string, path: string | null, name: string): Promise<string | null>
+  saveSql(
+    sql: string,
+    path: string | null,
+    name: string,
+    connectionId: string | null
+  ): Promise<string | null>
+  // The connection's files, most recently used first.
+  list(connectionId: string): Promise<QueryFileEntry[]>
+  // Takes a file off the connection's list (the file itself stays).
+  forget(connectionId: string, path: string): Promise<void>
+}
+
+// Each connection's runs, kept between launches (the last 1,000).
+export interface HistoryApi {
+  // Newest first.
+  list(connectionId: string): Promise<HistoryEntry[]>
+  add(connectionId: string, entry: NewHistoryEntry): Promise<void>
+  clear(connectionId: string): Promise<void>
 }
 
 export interface SettingsApi {
@@ -85,7 +112,7 @@ export interface SettingsApi {
 }
 
 // Why query tabs with unsaved SQL are about to close.
-export type CloseReason = 'close-tab' | 'disconnect' | 'close-window'
+export type CloseReason = 'close-tab' | 'disconnect' | 'switch' | 'close-window'
 
 // The answer to the save prompt. When the user has turned the prompt off, it is 'discard'.
 export type SaveChoice = 'save' | 'discard' | 'cancel'

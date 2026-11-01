@@ -1,11 +1,10 @@
 import { useState } from 'react'
 import { PanelRightIcon } from '@renderer/components/icons'
 import { MainArea } from '@renderer/components/SidePanel'
-import { Button, DbMark, IconButton } from '@renderer/components/ui'
+import { IconButton } from '@renderer/components/ui'
 import { RowPanel } from '@renderer/features/json-viewer/RowPanel'
-import { TableList } from '@renderer/features/sidebar/TableList'
-import { useSession, type Session } from '@renderer/store/session'
-import { settleUnsaved } from './closing'
+import { Sidebar } from '@renderer/features/sidebar/Sidebar'
+import type { Session } from '@renderer/store/session'
 import { Panes } from './Panes'
 import { useWorkspaceShortcuts } from './shortcuts'
 
@@ -16,13 +15,9 @@ export function Workspace({ session }: { session: Session }): React.JSX.Element 
   return (
     // The connection's database type sets the accent colour for the whole workspace.
     <div data-db={session.type} className="flex h-full flex-col">
-      {/* The window's top band; on macOS it is the title bar, holding the traffic lights (frameless). */}
-      <header className="flex h-10 shrink-0 items-center gap-2.5 border-b border-line bg-sunken pr-2 pl-3 select-none frameless:app-drag frameless:pl-20">
-        <DbMark type={session.type} />
-        <span className="truncate font-semibold">{session.name}</span>
-        {session.detail !== session.name && (
-          <span className="truncate text-[12px] text-muted">{session.detail}</span>
-        )}
+      {/* The window's top band; on macOS it is the title bar, holding the traffic lights
+          (frameless). The connection's name and menu are in the sidebar's connection bar. */}
+      <header className="flex h-10 shrink-0 items-center border-b border-line bg-sunken pr-2 pl-3 select-none frameless:app-drag frameless:pl-20">
         <div className="ml-auto flex shrink-0 items-center gap-1 app-no-drag">
           <IconButton
             label="Row panel"
@@ -31,34 +26,16 @@ export function Workspace({ session }: { session: Session }): React.JSX.Element 
           >
             <PanelRightIcon />
           </IconButton>
-          <DisconnectButton />
         </div>
       </header>
 
       <div className="flex min-h-0 flex-1">
-        <TableList connectionId={session.connectionId} />
+        <Sidebar session={session} />
         <MainArea className="flex">
           <Panes connectionId={session.connectionId} dbType={session.type} />
         </MainArea>
         {showRow && <RowPanel />}
       </div>
     </div>
-  )
-}
-
-// Disconnecting closes every tab, so it first asks about query tabs with unsaved SQL, as closing
-// the window does (see closing.ts).
-function DisconnectButton(): React.JSX.Element {
-  const close = useSession((s) => s.close)
-  return (
-    <Button
-      onClick={() => {
-        void settleUnsaved('disconnect').then((ok) => {
-          if (ok) void close()
-        })
-      }}
-    >
-      Disconnect
-    </Button>
   )
 }

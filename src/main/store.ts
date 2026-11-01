@@ -1,5 +1,5 @@
-// trowel.db in the app's userData folder: saved connections (connections.ts) and settings
-// (settings.ts). better-sqlite3 is synchronous, which is fine for tables this small.
+// trowel.db in the app's userData folder: saved connections (connections.ts), settings
+// (settings.ts), and each connection's query files and history (library.ts). better-sqlite3 is synchronous, which is fine for tables this small.
 import { join } from 'path'
 import Database from 'better-sqlite3'
 import { app } from 'electron'
@@ -16,7 +16,24 @@ const MIGRATIONS = [
   `create table settings (
     key text primary key, -- a key of Settings in src/shared/types.ts
     value text not null -- its value as JSON
-  )`
+  )`,
+  `alter table connections add column last_used integer; -- ms since the epoch
+  create table query_files ( -- .sql files saved or opened while connected (library.ts)
+    connection text not null, -- connectionKey() in library.ts
+    path text not null,
+    used_at integer not null,
+    primary key (connection, path)
+  );
+  create table query_history ( -- each run of a query tab (library.ts)
+    id integer primary key,
+    connection text not null, -- connectionKey() in library.ts
+    sql text not null,
+    ran_at integer not null,
+    duration_ms real not null,
+    status text not null, -- done, failed or cancelled
+    summary text not null
+  );
+  create index query_history_by_connection on query_history (connection, id);`
 ]
 
 let db: Database.Database | undefined

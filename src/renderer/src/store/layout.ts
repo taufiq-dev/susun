@@ -5,7 +5,8 @@ import { persist } from 'zustand/middleware'
 export const SIDE_PANELS = {
   // The saved connections, on the connect screen.
   connections: { width: 256, min: 180 },
-  tables: { width: 240, min: 160 },
+  // The workspace's left side: the activity bar and its view (tables, saved queries, history).
+  sidebar: { width: 288, min: 216 },
   row: { width: 288, min: 200 }
 }
 
@@ -17,9 +18,16 @@ const DEFAULT_WIDTHS = Object.fromEntries(
   Object.entries(SIDE_PANELS).map(([id, panel]) => [id, panel.width])
 ) as Widths
 
+// What the sidebar shows, chosen in its activity bar.
+export type SidebarView = 'tables' | 'saved' | 'history'
+
+const SIDEBAR_VIEWS: SidebarView[] = ['tables', 'saved', 'history']
+
 interface LayoutState {
   widths: Widths
+  sidebarView: SidebarView
   setWidth(id: SidePanelId, width: number): void
+  setSidebarView(view: SidebarView): void
 }
 
 // The side panels' widths as last dragged, kept in localStorage between launches.
@@ -27,21 +35,25 @@ export const useLayout = create<LayoutState>()(
   persist(
     (set) => ({
       widths: DEFAULT_WIDTHS,
-      setWidth: (id, width) => set((s) => ({ widths: { ...s.widths, [id]: width } }))
+      sidebarView: 'tables',
+      setWidth: (id, width) => set((s) => ({ widths: { ...s.widths, [id]: width } })),
+      setSidebarView: (sidebarView) => set({ sidebarView })
     }),
     {
       name: 'trowel-layout',
-      partialize: (s) => ({ widths: s.widths }),
-      // Takes the saved widths that are numbers, keeping the defaults for any others (such as a
-      // panel added since they were saved).
+      partialize: (s) => ({ widths: s.widths, sidebarView: s.sidebarView }),
+      // Takes the saved widths that are numbers and a known view, keeping the defaults for the rest
+      // (such as a panel added since they were saved).
       merge: (saved, current) => {
+        const { widths: savedWidths, sidebarView } =
+          (saved as { widths?: Record<string, unknown>; sidebarView?: unknown } | undefined) ?? {}
         const widths = { ...current.widths }
-        const savedWidths = (saved as { widths?: Record<string, unknown> } | undefined)?.widths
         for (const id of Object.keys(widths) as SidePanelId[]) {
           const width = savedWidths?.[id]
           if (typeof width === 'number' && Number.isFinite(width)) widths[id] = width
         }
-        return { ...current, widths }
+        const view = SIDEBAR_VIEWS.find((v) => v === sidebarView) ?? current.sidebarView
+        return { ...current, widths, sidebarView: view }
       }
     }
   )

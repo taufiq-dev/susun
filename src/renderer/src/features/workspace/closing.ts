@@ -34,7 +34,7 @@ export function closeTab(connectionId: string, tabId: string): Promise<boolean> 
   })
 }
 
-// Before every tab closes (disconnecting, or the window closing): asks once about all the query
+// Before every tab closes (disconnecting, switching, or the window closing): asks once about all the query
 // tabs with unsaved SQL, and saves them if the user chooses Save All, showing each one as its Save
 // dialog opens. Resolves to whether the tabs may close.
 export function settleUnsaved(reason: Exclude<CloseReason, 'close-tab'>): Promise<boolean> {

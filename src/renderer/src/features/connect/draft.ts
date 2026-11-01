@@ -1,4 +1,4 @@
-import type { ConnectionConfig, DbType, SavedConnection, SslMode } from '@shared/types'
+import type { ConnectionConfig, DbType, SavedConnectionInput, SslMode } from '@shared/types'
 
 export const DB_LABELS: Record<DbType, string> = {
   postgres: 'PostgreSQL',
@@ -37,7 +37,8 @@ export function emptyDraft(): Draft {
   }
 }
 
-export function draftFromSaved({ id, name, config }: SavedConnection): Draft {
+// A saved connection's form, or (without an id) a form filled in from a connection not saved.
+export function draftFromSaved({ id, name, config }: SavedConnectionInput): Draft {
   if (config.type === 'sqlite')
     return { ...emptyDraft(), id, name, type: 'sqlite', file: config.file }
   // Connections saved before SSL modes existed have no `ssl`.

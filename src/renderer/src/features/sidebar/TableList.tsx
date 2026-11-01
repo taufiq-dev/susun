@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import type { TableInfo } from '@shared/types'
 import { RefreshIcon } from '@renderer/components/icons'
 import { moveFocus } from '@renderer/components/roving'
-import { SidePanel } from '@renderer/components/SidePanel'
 import { Button, IconButton, TextInput } from '@renderer/components/ui'
 import { focusedTab, sameTable, useTabs } from '@renderer/store/tabs'
 
@@ -52,13 +51,8 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   }
 
   return (
-    <SidePanel
-      id="tables"
-      side="left"
-      label="Tables"
-      resizeLabel="Resize the tables list"
-      className="select-none"
-    >
+    // The sidebar's Tables view.
+    <section aria-label="Tables" className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-1 p-2">
         <TextInput
           type="search"
@@ -114,7 +108,7 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
           />
         )}
       </div>
-    </SidePanel>
+    </section>
   )
 }
 

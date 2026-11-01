@@ -84,8 +84,8 @@ interface TabsState {
   queryCount: number
   // The editor share a new query tab starts with: the last one set.
   editorFraction: number
-  // In the given pane, or else the focused one.
-  openQuery(paneId?: string): void
+  // In the given pane, or else the focused one, with the SQL if given.
+  openQuery(paneId?: string, sql?: string): void
   // Opens a query tab on the file in the focused pane, or activates the tab already open on it.
   openFile(file: SqlFile): void
   // The tab has been saved to the file, with this SQL.
@@ -199,9 +199,9 @@ export const useTabs = create<TabsState>()((set) => ({
   ...initial(),
   editorFraction: 0.4,
 
-  openQuery: (paneId) =>
+  openQuery: (paneId, sql) =>
     set((s) => {
-      const tab = newQueryTab(s)
+      const tab = newQueryTab(s, sql)
       return {
         tabs: [...s.tabs, tab],
         queryCount: s.queryCount + 1,

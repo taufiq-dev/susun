@@ -9,6 +9,12 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Decided
 
+- **A sidebar with an activity bar, and a connection bar** (the user's choices, after Beekeeper Studio's
+  layout). The left side has views for tables, saved queries and recent queries, and at its foot the
+  connection's name and type, whose menu disconnects, edits or switches the connection. Saved queries lists
+  the `.sql` files saved or opened while connected to that database (not a list kept inside Trowel); recent
+  queries are that connection's runs, the last 1,000. Edit connection disconnects and opens the form. The
+  connection's name and Disconnect leave the top bar.
 - **Unsaved SQL: a save prompt, query files and a Settings window** (the user's choices). Closing a query tab
   with unsaved SQL, disconnecting, closing the window or quitting asks first, in the native dialog (a sheet on
   macOS) with Save, Don't Save, Cancel and "Don't ask again"; Disconnect uses it too, in place of its
@@ -302,6 +308,28 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     still pass with the prompt turned off. Not done: a running query on a tab whose SQL is saved closes with
     no prompt (Disconnect's old confirmation asked about it), and a query tab's SQL still isn't kept when
     the app quits without saving.
+  - [x] **Sidebar views and the connection bar** (asked for after the save prompts; see "Decided") —
+    - An activity bar at the left of the sidebar picks Tables, Saved queries or Recent queries (kept in
+      localStorage); arrow keys move between them. The views stay mounted while hidden.
+    - Saved queries: the connection's `.sql` files, most recently used first, with their folder; one
+      that's moved or deleted shows as missing; × takes it off the list; a folder button opens a file.
+    - Recent queries: each finished run (the SQL as written, when, how it went, how long), newest first,
+      filterable; clicking one opens its SQL in a new tab; the bin clears the history after a second click.
+    - The connection bar: the name and type; its menu opens upward with Disconnect, Edit connection, and
+      Switch connection, a submenu of the other saved connections, most recently used first, and All
+      connections…. Switching asks about unsaved SQL ("before switching connections"), connects to the
+      other one first, so there's no blank moment, and on failure opens the connect screen on its form with
+      the error. Edit connection disconnects and opens the form (with the saved connection selected).
+    - Main process: migration 3 (`connections.last_used`, `query_files`, `query_history`), `library.ts`,
+      `api.history`, and `api.files.list/readSql/forget`; `api.db.connect` takes the saved connection's id.
+    - The top bar keeps only the row panel button.
+    Tested in the built app (dialogs stubbed): history entries and their summaries, filtering, opening one;
+    Save and Open adding files, reopening from the list, a deleted file shown as missing, removing one; the
+    menu's position above the bar, the submenu on hover and from the keyboard, Escape closing the submenu
+    then the menu; switching with an unsaved tab (prompt, then a fresh workspace, a separate history, and
+    the recent order updated); switching to a server that's down; Edit connection; Disconnect. The 9a, 9c,
+    10a-10c, fixes, keyboard and save-prompt tests pass with their selectors updated (the sessions test
+    once stopped partway and didn't again in three reruns).
   - [ ] **10e. New Window** — opens another connect screen in a new window, from the File menu (the app menu
     now exists).
 - [ ] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with

@@ -1,4 +1,6 @@
 import type { Statement } from '@shared/split'
+import type { NewHistoryEntry } from '@shared/types'
+import { useLibrary } from '@renderer/store/library'
 import { useTabs, type QueryRun, type QueryTabState, type StatementRun } from '@renderer/store/tabs'
 
 // While a script runs, its progress is written to the store at most this often, so a script of
@@ -37,6 +39,41 @@ async function tabSession(connectionId: string, tabId: string): Promise<string |
   return sessionId
 }
 
+function count(n: number, noun: string): string {
+  return `${n.toLocaleString()} ${noun}${n === 1 ? '' : 's'}`
+}
+
+// A finished run for the connection's history: the SQL as written in the editor, from the first
+// statement's start to the last one's end, and a line on how it went.
+function historyEntry(
+  sql: string,
+  statements: Statement[],
+  ran: StatementRun[],
+  state: QueryRun['state'],
+  durationMs: number
+): NewHistoryEntry {
+  const text = sql.slice(statements[0].from, statements[statements.length - 1].to)
+  const last = ran[ran.length - 1]
+  let summary: string
+  if (state === 'cancelled') summary = 'Cancelled'
+  else if (last && 'error' in last) summary = last.error.split('\n')[0]
+  else if (statements.length > 1) summary = count(ran.length, 'statement')
+  else if (last && last.result.columns.length > 0) {
+    summary = count(last.result.rowCount ?? last.result.rows.length, 'row')
+  } else summary = `${count(last?.result.rowCount ?? 0, 'row')} changed`
+  const status = state === 'cancelled' ? 'cancelled' : state === 'failed' ? 'failed' : 'done'
+  return { sql: text, status, summary, durationMs }
+}
+
+// Adds the run to the connection's history. A failure only goes to the console: the run itself
+// is fine.
+function remember(connectionId: string, entry: NewHistoryEntry): void {
+  window.api.history.add(connectionId, entry).then(
+    () => useLibrary.getState().historyChanged(),
+    (err: Error) => console.error('adding to history failed:', err.message)
+  )
+}
+
 // Runs a query tab's statements one at a time in the tab's own session, stopping at the first
 // error or at Cancel, and records the run in the tabs store so it isn't lost when the tab's
 // component unmounts. Does nothing without statements, or while the tab's last run is going.
@@ -52,8 +89,11 @@ export async function runQuery(
   const id = ++lastRunId
   const ran: StatementRun[] = []
   let connecting = !tab.sessionId
+  let finalState: QueryRun['state'] = 'running'
+  let started = 0
   // Keeps what the user changed meanwhile: the result shown, a failed cancel.
   const record = (state: QueryRun['state'], connectError?: string): void => {
+    finalState = state
     const current = queryTab(tabId)?.run
     useTabs.getState().setRun(tabId, {
       ...(current?.id === id ? current : {}),
@@ -80,6 +120,7 @@ export async function runQuery(
       connecting = false
       record('running')
     }
+    started = performance.now()
     let recordedAt = performance.now()
     for (const statement of statements) {
       if (!isOpen(tabId)) return
@@ -105,6 +146,11 @@ export async function runQuery(
     record(cancelled.has(id) ? 'cancelled' : 'done')
   } finally {
     cancelled.delete(id)
+    // A run that got going and finished (not one whose tab closed, or that couldn't connect).
+    if (started && finalState !== 'running') {
+      const durationMs = performance.now() - started
+      remember(connectionId, historyEntry(tab.sql, statements, ran, finalState, durationMs))
+    }
   }
 }
 

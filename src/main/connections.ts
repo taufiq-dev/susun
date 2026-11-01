@@ -5,6 +5,7 @@
 import { randomUUID } from 'crypto'
 import { safeStorage } from 'electron'
 import type { ConnectionConfig, SavedConnection, SavedConnectionInput } from '@shared/types'
+import { forgetSavedConnection } from './library'
 import { store } from './store'
 
 interface Row {
@@ -12,11 +13,14 @@ interface Row {
   name: string
   config: string
   password: Buffer | null
+  last_used: number | null
 }
 
 export async function listConnections(): Promise<SavedConnection[]> {
   const rows = store()
-    .prepare('select id, name, config, password from connections order by name collate nocase, id')
+    .prepare(
+      'select id, name, config, password, last_used from connections order by name collate nocase, id'
+    )
     .all() as Row[]
   return Promise.all(rows.map(toSaved))
 }
@@ -42,12 +46,18 @@ export async function saveConnection(input: SavedConnectionInput): Promise<Saved
 
 export async function removeConnection(id: string): Promise<void> {
   store().prepare('delete from connections where id = ?').run(id)
+  forgetSavedConnection(id)
+}
+
+// It was just connected to, which puts it first among recent connections.
+export function markUsed(id: string): void {
+  store().prepare('update connections set last_used = ? where id = ?').run(Date.now(), id)
 }
 
 async function toSaved(row: Row): Promise<SavedConnection> {
   const config = JSON.parse(row.config) as ConnectionConfig
   if (config.type !== 'sqlite') config.password = await decrypt(row)
-  return { id: row.id, name: row.name, config }
+  return { id: row.id, name: row.name, config, lastUsedAt: row.last_used ?? undefined }
 }
 
 // The password lives in its own column, encrypted, so it never appears in the config JSON.

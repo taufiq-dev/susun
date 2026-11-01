@@ -24,7 +24,7 @@ function listen<C extends keyof AppEvents>(
 // Custom APIs for renderer
 const api: Api = {
   db: {
-    connect: (config) => invoke('db:connect', config),
+    connect: (config, savedId) => invoke('db:connect', config, savedId),
     disconnect: (connectionId) => invoke('db:disconnect', connectionId),
     openSession: (connectionId) => invoke('db:openSession', connectionId),
     closeSession: (sessionId) => invoke('db:closeSession', sessionId),
@@ -42,8 +42,17 @@ const api: Api = {
     openSqliteFile: () => invoke('dialog:openSqliteFile')
   },
   files: {
-    openSql: () => invoke('files:openSql'),
-    saveSql: (sql, path, name) => invoke('files:saveSql', sql, path, name)
+    openSql: (connectionId) => invoke('files:openSql', connectionId),
+    readSql: (connectionId, path) => invoke('files:readSql', connectionId, path),
+    saveSql: (sql, path, name, connectionId) =>
+      invoke('files:saveSql', sql, path, name, connectionId),
+    list: (connectionId) => invoke('files:list', connectionId),
+    forget: (connectionId, path) => invoke('files:forget', connectionId, path)
+  },
+  history: {
+    list: (connectionId) => invoke('history:list', connectionId),
+    add: (connectionId, entry) => invoke('history:add', connectionId, entry),
+    clear: (connectionId) => invoke('history:clear', connectionId)
   },
   settings: {
     get: () => invoke('settings:get'),
