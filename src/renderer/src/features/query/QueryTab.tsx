@@ -98,7 +98,7 @@ export function QueryTab({
             autoFocus
           />
         </div>
-        <div className="flex h-9 shrink-0 items-center gap-3 pr-2 pl-3">
+        <div className="flex h-10 shrink-0 items-center gap-3 pr-2 pb-1 pl-3">
           <span role="status" className="min-w-0 flex-1 truncate text-[12px]">
             <RunStatus run={tab.run} />
           </span>
