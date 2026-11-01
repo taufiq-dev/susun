@@ -1,6 +1,7 @@
-import { Fragment } from 'react'
+import { Fragment, useRef } from 'react'
 import { ROW_LIMIT, type QueryResult } from '@shared/types'
 import { ResultGrid } from '@renderer/components/ResultGrid'
+import { useRevealSelected } from '@renderer/components/useRevealSelected'
 import type { QueryRun, StatementRun } from '@renderer/store/tabs'
 
 // The statements list shows at most this many, the latest, so a long script stays quick to draw.
@@ -202,11 +203,18 @@ function ScriptResults({
     run.view ??
     (run.state === 'done' && withRows.length > 0 ? withRows[withRows.length - 1] : 'statements')
   const shown = typeof view === 'number' ? run.statements[view] : undefined
+  const tabs = useRef<HTMLDivElement>(null)
+  useRevealSelected(tabs, view)
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-8 shrink-0 items-stretch border-b border-line px-1 select-none">
-        <div role="tablist" aria-label="Results" className="flex min-w-0 overflow-x-auto">
+        <div
+          ref={tabs}
+          role="tablist"
+          aria-label="Results"
+          className="flex min-w-0 overflow-x-auto"
+        >
           {withRows.map((index, k) => (
             <ViewTab
               key={index}
@@ -264,9 +272,7 @@ function ViewTab({
       title={title}
       onClick={onClick}
       className={`focus-ring shrink-0 px-2.5 text-[12px] whitespace-nowrap ${
-        selected
-          ? 'font-medium text-ink shadow-[inset_0_-2px_0_var(--accent)]'
-          : 'text-muted hover:text-ink'
+        selected ? 'text-ink shadow-[inset_0_-2px_0_var(--accent)]' : 'text-muted hover:text-ink'
       }`}
     >
       {children}

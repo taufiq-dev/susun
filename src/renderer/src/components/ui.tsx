@@ -118,7 +118,7 @@ export function Segmented<T extends string>({
               key={option.value}
               className={`inline-flex h-6 items-center gap-1.5 rounded-[4px] px-3 has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent ${
                 checked
-                  ? 'bg-surface font-medium text-ink shadow-[0_0_0_1px_var(--line)]'
+                  ? 'bg-surface text-ink shadow-[0_0_0_1px_var(--line)]'
                   : 'text-muted hover:text-ink'
               }`}
             >

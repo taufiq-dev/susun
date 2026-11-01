@@ -125,7 +125,7 @@ export function QueryTab({
             title="Stop the running statement; the statements after it don’t run"
             className="min-w-20"
           >
-            {tab.run.cancelling ? 'Cancelling…' : 'Cancel'}
+            Cancel
           </Button>
         ) : (
           <Button

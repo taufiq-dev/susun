@@ -11,6 +11,7 @@ import type { ConnectionsApi, DbApi, DialogApi, IpcResult } from '@shared/api'
 import type { ConnectionConfig } from '@shared/types'
 import { listConnections, removeConnection, saveConnection } from './connections'
 import { createClient, type DbClient } from './db'
+import { errorMessage } from './db/errors'
 
 // The main-process side of an API group in @shared/api: the same methods, each also given the
 // invoking event.
@@ -143,16 +144,6 @@ const dialogs: Handlers<DialogApi> = {
       : await dialog.showOpenDialog(SQLITE_FILE_DIALOG)
     return canceled ? null : (filePaths[0] ?? null)
   }
-}
-
-// Connecting to "localhost" tries ::1 and 127.0.0.1, and if both fail Node throws an
-// AggregateError with an empty message; its inner errors say what happened.
-function errorMessage(err: unknown): string {
-  if (err instanceof AggregateError && !err.message) {
-    return err.errors.map(errorMessage).join('; ')
-  }
-  if (err instanceof Error) return err.message || err.name
-  return String(err)
 }
 
 function handle<T>(group: string, handlers: Handlers<T>): void {

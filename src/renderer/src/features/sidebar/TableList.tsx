@@ -10,6 +10,8 @@ type Loaded = { tables: TableInfo[] } | { error: string }
 export function TableList({ connectionId }: { connectionId: string }): React.JSX.Element {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [reloads, setReloads] = useState(0)
+  // A reload keeps the list it has (and its scroll position) until the new one arrives.
+  const [reloading, setReloading] = useState(false)
   const [filter, setFilter] = useState('')
   const openTable = useTabs((s) => s.openTable)
   // The focused pane's table, if it shows one.
@@ -21,8 +23,16 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   useEffect(() => {
     let current = true
     window.api.db.listTables(connectionId).then(
-      (tables) => current && setLoaded({ tables }),
-      (err: Error) => current && setLoaded({ error: err.message })
+      (tables) => {
+        if (!current) return
+        setLoaded({ tables })
+        setReloading(false)
+      },
+      (err: Error) => {
+        if (!current) return
+        setLoaded({ error: err.message })
+        setReloading(false)
+      }
     )
     return () => {
       current = false
@@ -30,7 +40,7 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   }, [connectionId, reloads])
 
   const reload = (): void => {
-    setLoaded(null)
+    setReloading(true)
     setReloads((n) => n + 1)
   }
 
@@ -50,7 +60,7 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
         />
-        <IconButton label="Reload tables" onClick={reload}>
+        <IconButton label="Reload tables" onClick={reload} disabled={reloading}>
           <RefreshIcon />
         </IconButton>
       </div>
@@ -59,7 +69,9 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
         {loaded && 'error' in loaded && (
           <div className="flex flex-col items-start gap-2 px-3">
             <p className="text-[12px] text-danger select-text">{loaded.error}</p>
-            <Button onClick={reload}>Try again</Button>
+            <Button onClick={reload} disabled={reloading}>
+              Try again
+            </Button>
           </div>
         )}
         {loaded && 'tables' in loaded && (

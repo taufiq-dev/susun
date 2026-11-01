@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { ContextMenu, type MenuEntry } from '@renderer/components/ContextMenu'
 import {
   CloseIcon,
@@ -8,6 +8,7 @@ import {
   SplitRightIcon
 } from '@renderer/components/icons'
 import { IconButton } from '@renderer/components/ui'
+import { useRevealSelected } from '@renderer/components/useRevealSelected'
 import { endSession } from '@renderer/features/query/run'
 import type { Pane } from '@renderer/store/panes'
 import { useSession } from '@renderer/store/session'
@@ -43,6 +44,8 @@ export function TabBar({
   const connectionId = useSession((s) => s.session?.connectionId)
   const [menu, setMenu] = useState<{ x: number; y: number; tab: Tab } | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
+  const list = useRef<HTMLDivElement>(null)
+  useRevealSelected(list, pane.activeId)
 
   const close = (id: string): void => {
     if (connectionId) endSession(connectionId, id)
@@ -80,7 +83,7 @@ export function TabBar({
 
   return (
     <div className="flex h-9 shrink-0 items-stretch border-b border-line bg-sunken select-none">
-      <div role="tablist" aria-label={label} className="flex min-w-0 overflow-x-auto">
+      <div ref={list} role="tablist" aria-label={label} className="flex min-w-0 overflow-x-auto">
         {tabs.map((tab) => {
           const selected = tab.id === pane.activeId
           return (

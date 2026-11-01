@@ -228,6 +228,28 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     app: drags, the minimums and the 400 px limit, keys, double-click, the widths surviving a reload and the
     row panel being hidden and shown, the panels giving way at 960 px wide, and the tables list's edge
     taking the pointer over the editor's gutter, which has its own z-index.
+  - [x] **Design review fixes** (from a review against design-engineering principles; the user chose fixes 1-5
+    together, then 6 on its own) —
+    1. Disconnect asks for a second click ("Close 2 query tabs and disconnect") when a query tab has SQL or a
+       running query; clicking elsewhere or Escape takes it back. Closing a query tab or the window still
+       loses its SQL with no warning or undo.
+    2. No layout shift: the connect form's buttons keep their labels while busy (the status line says
+       "Connecting…", "Testing the connection…"), Cancel stays "Cancel" while cancelling (the status says
+       so), and the selected Type/SSL option and result tab no longer turn bolder.
+    3. A tab bar or a script's result tabs scroll the selected tab into view (`useRevealSelected`).
+    4. Reloading the tables list keeps the old list, and its scroll, until the new one arrives.
+    5. Connection errors whose driver message is only a code say what's wrong in plain words, with the
+       driver's message beneath (`src/main/db/errors.ts`). Testing them found that pg pointed at a MySQL or
+       MariaDB port threw inside its socket handler, uncatchable, which in the main process would have been
+       an uncaught exception and a connect that never settled; a guarded socket now fails the connect.
+    Tested in the built app: refused, host not found, Postgres to the MariaDB port, MySQL to the Postgres
+    port (10 s timeout) and a bad password (unchanged); button, option and tab widths before and during
+    each state; 14 tabs and 30 result tabs scrolled to the selected one; no "Loading tables…" on reload;
+    Disconnect with real mouse clicks. The 10a-10c, 9a and 9c tests still pass.
+  - [ ] **Keyboard navigation** (design review fix 6) — arrow keys within a tab bar and the tables list
+    (one Tab stop each), Enter in the tables filter opens the only match, and focus after a tab menu choice.
+  - [ ] **Title bar in the theme** (asked for after the design fixes) — macOS can't recolour its title bar, so
+    hide it (`titleBarStyle: 'hidden'`) and put the traffic lights in Trowel's own top band.
   - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
   - [ ] **10e. New Window** — opens another connect screen in a new window (a custom app menu, which also
     allows Cmd+W for tabs).

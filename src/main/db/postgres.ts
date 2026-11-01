@@ -5,6 +5,7 @@ import {
   type CustomTypesConfig,
   type QueryResult as PgResult
 } from 'pg'
+import { Socket } from 'net'
 import Cursor from 'pg-cursor'
 import {
   ROW_LIMIT,
@@ -16,7 +17,8 @@ import {
 } from '@shared/types'
 import type { DbClient } from './client'
 import { stopsAtLimit } from './limit'
-import { tlsOptions, withoutNodeHint } from './tls'
+import { CONNECT_TIMEOUT_MS, NOT_POSTGRES, connectError } from './errors'
+import { tlsOptions } from './tls'
 
 // relkind: r table, p partitioned table, f foreign table, v view, m materialized view.
 // Partitions are left out, since they can number in the thousands.
@@ -84,9 +86,28 @@ function clientConfig(config: ServerConnectionConfig): ClientConfig {
     database: config.database || undefined,
     // Explicitly false when off: left undefined, pg would read PGSSLMODE from the environment.
     ssl: tlsOptions(config.ssl) ?? false,
-    connectionTimeoutMillis: 10_000,
+    connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    stream: () => new GuardedSocket(),
     application_name: 'Trowel',
     types: TYPES
+  }
+}
+
+// pg parses what the server sends in the socket's 'data' handler, and on bytes that aren't the
+// Postgres protocol (as when the port is a MySQL server's) it throws there, where nothing can catch
+// it: the main process would get an uncaught exception and the connect would never settle. This
+// socket turns such a throw into a socket error, which fails the connect (or the query) instead.
+class GuardedSocket extends Socket {
+  override emit(event: string | symbol, ...args: unknown[]): boolean {
+    try {
+      return super.emit(event, ...args)
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err)
+      this.destroy(
+        Object.assign(new Error(`Not the PostgreSQL protocol: ${message}`), { code: NOT_POSTGRES })
+      )
+      return true
+    }
   }
 }
 
@@ -96,7 +117,7 @@ async function connected(config: ServerConnectionConfig): Promise<Client> {
   // queries reject with their own error.
   client.on('error', (err) => console.error('postgres connection error:', err.message))
   await client.connect().catch((err) => {
-    throw withoutNodeHint(err)
+    throw connectError(err, config)
   })
   return client
 }

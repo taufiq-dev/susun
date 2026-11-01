@@ -8,9 +8,24 @@ import { defaultName, describe, draftFromSaved, emptyDraft, toConfig, type Draft
 
 type Busy = 'test' | 'connect' | 'save' | 'delete'
 
+// What the status line says while an action runs. The buttons keep their labels, so they don't
+// change width and move the ones beside them.
+const BUSY_TEXT: Record<Busy, string> = {
+  connect: 'Connecting…',
+  test: 'Testing the connection…',
+  save: 'Saving…',
+  delete: 'Deleting…'
+}
+
 interface Status {
-  kind: 'ok' | 'error'
+  kind: 'busy' | 'ok' | 'error'
   text: string
+}
+
+const STATUS_COLOURS: Record<Status['kind'], string> = {
+  busy: 'text-muted',
+  ok: 'text-ok',
+  error: 'text-danger'
 }
 
 export function ConnectScreen(): React.JSX.Element {
@@ -53,10 +68,10 @@ export function ConnectScreen(): React.JSX.Element {
   // Runs one form action, showing its outcome (or its error) under the buttons.
   const run = async (kind: Busy, action: () => Promise<Status | void>): Promise<void> => {
     setBusy(kind)
-    setStatus(null)
+    setStatus({ kind: 'busy', text: BUSY_TEXT[kind] })
     try {
       const outcome = await action()
-      if (outcome) setStatus(outcome)
+      setStatus(outcome ?? null)
     } catch (err) {
       setStatus({ kind: 'error', text: (err as Error).message })
     } finally {
@@ -179,13 +194,13 @@ export function ConnectScreen(): React.JSX.Element {
           <div className="flex flex-col gap-3">
             <div className="flex items-center gap-2">
               <Button type="submit" variant="primary" disabled={busy !== null}>
-                {busy === 'connect' ? 'Connecting…' : 'Connect'}
+                Connect
               </Button>
               <Button onClick={() => void test()} disabled={busy !== null}>
-                {busy === 'test' ? 'Testing…' : 'Test connection'}
+                Test connection
               </Button>
               <Button onClick={() => void save()} disabled={busy !== null}>
-                {busy === 'save' ? 'Saving…' : 'Save'}
+                Save
               </Button>
               {draft.id && (
                 <Button
@@ -198,17 +213,27 @@ export function ConnectScreen(): React.JSX.Element {
                 </Button>
               )}
             </div>
-            <p
-              role="status"
-              className={`min-h-[1.4em] text-[12px] break-words select-text ${
-                status?.kind === 'error' ? 'text-danger' : 'text-ok'
-              }`}
-            >
-              {status?.text}
-            </p>
+            <StatusLine status={status} />
           </div>
         </form>
       </MainArea>
+    </div>
+  )
+}
+
+// The outcome of the last action, or what is running. An error's first paragraph says what went
+// wrong; any after it are detail, such as the driver's own message (see src/main/db/errors.ts).
+// It always takes at least a line, so the form doesn't move when it appears.
+function StatusLine({ status }: { status: Status | null }): React.JSX.Element {
+  const [summary, ...detail] = status?.text.split('\n\n') ?? []
+  return (
+    <div role="status" className="min-h-[1.4em] text-[12px] break-words select-text">
+      {status && <p className={STATUS_COLOURS[status.kind]}>{summary}</p>}
+      {detail.length > 0 && (
+        <p className="mt-1 font-mono text-[11px] whitespace-pre-wrap text-muted">
+          {detail.join('\n\n')}
+        </p>
+      )}
     </div>
   )
 }

@@ -17,7 +17,8 @@ import {
   type TableRef
 } from '@shared/types'
 import type { DbClient } from './client'
-import { tlsOptions, withoutNodeHint } from './tls'
+import { CONNECT_TIMEOUT_MS, connectError } from './errors'
+import { tlsOptions } from './tls'
 
 const LIST_TABLES = `
   select table_name as name, table_type as type
@@ -37,7 +38,7 @@ const LIST_COLUMNS = `
 
 async function connected(config: ServerConnectionConfig): Promise<Connection> {
   const conn = await createConnection(connectionOptions(config)).catch((err) => {
-    throw withoutNodeHint(err)
+    throw connectError(err, config)
   })
   // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
   // queries reject with their own error.
@@ -55,7 +56,7 @@ function connectionOptions(config: ServerConnectionConfig): ConnectionOptions {
     database: config.database || undefined,
     // mysql2 checks the certificate's host name only when asked to.
     ssl: tls && { ...tls, verifyIdentity: tls.rejectUnauthorized },
-    connectTimeout: 10_000,
+    connectTimeout: CONNECT_TIMEOUT_MS,
     // BIGINT and DECIMAL values that don't fit a JS number arrive as strings instead of being
     // rounded, so they display correctly and still match in a WHERE clause.
     supportBigNumbers: true,
