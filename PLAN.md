@@ -296,7 +296,18 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     foot in its own colour, status on the left and Run on the right, above a single line that drags to
     resize (it was the strip's top edge). Tested in the built app: no fill or borders, Run 8 px from the
     pane's edge, the line following a 100 px drag; the 9a, fixes and keyboard tests still pass.
-  - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
+  - [x] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
+    Tabs drag with HTML drag and drop (data type `application/x-trowel-tab`; `store/drag.ts` says which tab
+    is being dragged). A tab bar shows an accent line where the tab would land (before the tab whose middle is
+    past the pointer, or after the last) and moves it there (`moveTab`, a reorder in its own pane). While a tab
+    is dragged, each pane's content gets a layer over its editor or grid (which would otherwise take the drag)
+    with drop zones: the outer quarter on each side splits the pane there (`moveTabToSide`), shading the half
+    the new pane would take; the middle moves the tab into the pane. A drop that would change nothing (a tab
+    onto its own pane's middle, or a pane's only tab onto its edge) shows no zone. A pane a tab leaves empty
+    is removed. Unit tests for both moves; tested in the built app with real drags (started with the mouse,
+    intercepted and delivered with `Input.dispatchDragEvent`): reordering both ways with the line showing,
+    splitting at an edge with the zone showing, moving onto another pane's tab bar and into another pane's
+    middle (removing the emptied pane), splitting downwards, and a pane's only tab over its own edge.
   - [x] **Save prompts, query files and Settings** (asked for after the Run row; see "Decided") —
     - An app menu (`menu.ts`): Settings… (Cmd+,); File: New Query (Cmd+T), Open… (Cmd+O), Save (Cmd+S), Save
       As… (Cmd+Shift+S), Close Tab (Cmd+W; with no tab, or in Settings, it closes the window), Close Window

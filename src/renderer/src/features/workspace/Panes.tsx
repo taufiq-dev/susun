@@ -2,8 +2,11 @@ import type { DbType } from '@shared/types'
 import { Button } from '@renderer/components/ui'
 import { QueryTab } from '@renderer/features/query/QueryTab'
 import { TableTab } from '@renderer/features/table/TableTab'
-import { panesOf, type LayoutNode, type Pane, type Split } from '@renderer/store/panes'
+import { useState } from 'react'
+import { TAB_DRAG_TYPE, useDrag } from '@renderer/store/drag'
+import { panesOf, type LayoutNode, type Pane, type Side, type Split } from '@renderer/store/panes'
 import { useTabs } from '@renderer/store/tabs'
+import { focusPaneContent } from './shortcuts'
 import { TabBar } from './TabBar'
 
 // Resizing doesn't make a pane narrower or shorter than this, in pixels. Splitting can (five panes
@@ -207,6 +210,7 @@ function PaneView({ pane, connectionId, dbType }: Props & { pane: Pane }): React
   const active = useTabs((s) => s.tabs.find((t) => t.id === pane.activeId))
   const focusPane = useTabs((s) => s.focusPane)
   const openQuery = useTabs((s) => s.openQuery)
+  const dragging = useDrag((s) => s.tabId)
 
   return (
     <section
@@ -223,7 +227,8 @@ function PaneView({ pane, connectionId, dbType }: Props & { pane: Pane }): React
         focused={focused}
         label={number ? `Tabs in pane ${number}` : 'Open tabs'}
       />
-      <div className="min-h-0 flex-1">
+      <div className="relative min-h-0 flex-1">
+        {dragging && <DropZones pane={pane} tabId={dragging} />}
         {active?.type === 'query' && (
           <QueryTab key={active.id} tab={active} connectionId={connectionId} dbType={dbType} />
         )}
@@ -238,5 +243,77 @@ function PaneView({ pane, connectionId, dbType }: Props & { pane: Pane }): React
         )}
       </div>
     </section>
+  )
+}
+
+// Where in a pane a dragged tab would go: into it, or into a new pane on a side.
+type Zone = Side | 'centre'
+
+// The outer part of a pane, as a share of its width or height, that splits it when a tab is
+// dropped there; the rest moves the tab into the pane.
+const EDGE = 0.25
+
+function zoneAt(e: React.DragEvent<HTMLElement>): Zone {
+  const r = e.currentTarget.getBoundingClientRect()
+  const x = (e.clientX - r.left) / r.width
+  const y = (e.clientY - r.top) / r.height
+  const nearest = Math.min(x, 1 - x, y, 1 - y)
+  if (nearest >= EDGE) return 'centre'
+  if (nearest === x) return 'left'
+  if (nearest === 1 - x) return 'right'
+  return nearest === y ? 'up' : 'down'
+}
+
+// The part of the pane a zone shades: the half a new pane would take, or all of it.
+const ZONE_AREA: Record<Zone, string> = {
+  centre: 'inset-0',
+  left: 'inset-y-0 left-0 w-1/2',
+  right: 'inset-y-0 right-0 w-1/2',
+  up: 'inset-x-0 top-0 h-1/2',
+  down: 'inset-x-0 bottom-0 h-1/2'
+}
+
+// While a tab is dragged, a layer over the pane's content (above its editor or grid, which would
+// take the drag themselves) that shows and takes the drop: the middle moves the tab into the pane,
+// the edges split the pane on that side. A drop that would change nothing (a tab onto its own pane,
+// or a pane's only tab onto its edge) shows no zone.
+function DropZones({ pane, tabId }: { pane: Pane; tabId: string }): React.JSX.Element {
+  const [zone, setZone] = useState<Zone | null>(null)
+  const moveTab = useTabs((s) => s.moveTab)
+  const moveTabToSide = useTabs((s) => s.moveTabToSide)
+  const own = pane.tabIds.includes(tabId)
+  const allowed = (z: Zone): boolean => !own || (z !== 'centre' && pane.tabIds.length > 1)
+
+  return (
+    <div
+      className="absolute inset-0 z-20"
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes(TAB_DRAG_TYPE)) return
+        const z = zoneAt(e)
+        if (!allowed(z)) {
+          setZone(null)
+          return
+        }
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        setZone(z)
+      }}
+      onDragLeave={() => setZone(null)}
+      onDrop={(e) => {
+        const z = zoneAt(e)
+        setZone(null)
+        if (!allowed(z)) return
+        e.preventDefault()
+        if (z === 'centre') moveTab(tabId, pane.id, pane.tabIds.length)
+        else moveTabToSide(tabId, pane.id, z)
+        focusPaneContent(useTabs.getState().focusedPaneId)
+      }}
+    >
+      {zone && (
+        <div
+          className={`pointer-events-none absolute rounded-[4px] border-2 border-accent/60 bg-accent/15 ${ZONE_AREA[zone]}`}
+        />
+      )}
+    </div>
   )
 }

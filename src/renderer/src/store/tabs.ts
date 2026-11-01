@@ -132,6 +132,12 @@ interface TabsState {
   split(tabId: string, side: Side): void
   // Moves the tab into a new pane on `side` of its pane, unless it is the pane's only tab.
   moveToNewPane(tabId: string, side: Side): void
+  // Moves the tab into the pane at `index` among its tabs (in its own pane, a reorder), activating
+  // it there and focusing the pane. A pane it leaves empty is removed.
+  moveTab(tabId: string, paneId: string, index: number): void
+  // Moves the tab into a new pane on `side` of the pane, focusing it; not a pane's only tab to a side
+  // of its own pane. A pane it leaves empty is removed.
+  moveTabToSide(tabId: string, paneId: string, side: Side): void
   resize(splitId: string, sizes: number[]): void
   // Maximizes the pane and focuses it, or restores the layout if it is maximized. Does nothing while
   // there is only one pane.
@@ -341,6 +347,46 @@ export const useTabs = create<TabsState>()((set) => ({
       const target = newPane([tabId])
       const { root } = removeTab(s, tabId)
       return { root: insertPane(root, pane.id, side, target), focusedPaneId: target.id }
+    }),
+
+  moveTab: (tabId, paneId, index) =>
+    set((s) => {
+      const from = paneOfTab(s.root, tabId)
+      if (!from || !findPane(s.root, paneId)) return s
+      if (from.id === paneId) {
+        const old = from.tabIds.indexOf(tabId)
+        const tabIds = from.tabIds.filter((id) => id !== tabId)
+        // `index` counts the tab's own place, which is gone once it's taken out.
+        tabIds.splice(
+          Math.min(tabIds.length, Math.max(0, index > old ? index - 1 : index)),
+          0,
+          tabId
+        )
+        return {
+          root: updatePane(s.root, paneId, (p) => ({ ...p, tabIds, activeId: tabId })),
+          focusedPaneId: paneId
+        }
+      }
+      const { root } = removeTab(s, tabId)
+      const to = findPane(root, paneId)
+      if (!to) return s
+      const tabIds = [...to.tabIds]
+      tabIds.splice(Math.min(tabIds.length, Math.max(0, index)), 0, tabId)
+      return {
+        root: updatePane(root, paneId, (p) => ({ ...p, tabIds, activeId: tabId })),
+        focusedPaneId: paneId
+      }
+    }),
+
+  moveTabToSide: (tabId, paneId, side) =>
+    set((s) => {
+      const from = paneOfTab(s.root, tabId)
+      if (!from || !findPane(s.root, paneId)) return s
+      if (from.id === paneId && from.tabIds.length < 2) return s
+      const target = newPane([tabId])
+      const { root } = removeTab(s, tabId)
+      if (!findPane(root, paneId)) return s
+      return { root: insertPane(root, paneId, side, target), focusedPaneId: target.id }
     }),
 
   resize: (splitId, sizes) => set((s) => ({ root: resizeSplit(s.root, splitId, sizes) })),
