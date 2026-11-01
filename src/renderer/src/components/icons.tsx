@@ -1,6 +1,7 @@
 import {
   ArrowLeftRight,
   ChevronDown,
+  ChevronLeft,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -62,6 +63,9 @@ export const PencilIcon = sized(Pencil, NORMAL)
 export const SwitchIcon = sized(ArrowLeftRight, NORMAL)
 export const FolderOpenIcon = sized(FolderOpen, NORMAL)
 export const TrashIcon = sized(Trash2, NORMAL)
+// A table's pages.
+export const PreviousIcon = sized(ChevronLeft, NORMAL)
+export const NextIcon = sized(ChevronRight, NORMAL)
 export const CollapseAllIcon = sized(ChevronsDownUp, NORMAL)
 export const ExpandAllIcon = sized(ChevronsUpDown, NORMAL)
 

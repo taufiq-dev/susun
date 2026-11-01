@@ -382,7 +382,21 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a
   primary key are read-only. Table tabs share the connection's own session, so a save's transaction must not
-  interleave with other table tabs' queries: give the save a session of its own, or queue the others.
+  interleave with other table tabs' queries: give the save a session of its own, or queue the others. In
+  three parts, each committed on its own.
+  - [x] **11a. Rows, pages and order** — the table tab opens on its rows (Data), with Structure (the columns)
+    a switch away; the tab keeps its view, page, order and filter in the store. A page is 100 rows, asked for
+    as 101 to know whether there's a next one (no count unless asked: "Count rows" runs `count(*)` with the
+    filter). Clicking a column header sorts in the database (back to page 1; the grid only shows the arrow);
+    without a sort, rows are in primary key order, so pages are stable. Rows load on the connection's own
+    session; a page being fetched keeps the last one showing. The SQL is built by `src/shared/sql.ts`
+    (`selectPageSql`, `countSql`; unit tests). The table menu's View data and View structure open the tab on
+    either view. Tested in the built app on Postgres, MySQL and SQLite with 250-row scratch tables: pages 1
+    to 3 and back, sorting by a column both ways (the whole table's order, not one page's) and its second
+    page, counting, a table without a primary key, the tab keeping its page and order, Structure and back.
+  - [ ] **11b. Filter** — a column, an operator and a value, as a parameterized `WHERE`.
+  - [ ] **11c. Edits** — edit cells, set NULL, save the changed rows in one transaction on a session of its
+    own, or discard; tables without a primary key, and views, stay read-only.
 - [ ] **12. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`
   (folding included), plus a key filter box. Build the row object from `columns` (suffix repeated names, e.g.
   `id`, `id_2`). Convert first: `Uint8Array` → hex, Postgres `bigint` arrives as a

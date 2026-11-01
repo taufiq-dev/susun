@@ -23,7 +23,7 @@ import {
 import { Button, IconButton, TextInput } from '@renderer/components/ui'
 import { useSession } from '@renderer/store/session'
 import { focusedTab, sameTable, useTabs } from '@renderer/store/tabs'
-import { copyName, drop, selectTop, truncate, viewData } from './tableActions'
+import { copyName, drop, selectTop, truncate, viewData, viewStructure } from './tableActions'
 
 type Loaded = { tables: TableInfo[] } | { error: string }
 
@@ -218,13 +218,7 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
               tabStop={t === current}
               onOpen={() => openTable(t)}
               menu={
-                <TableMenu
-                  connectionId={connectionId}
-                  type={type}
-                  table={t}
-                  onStructure={() => openTable(t)}
-                  onDropped={reload}
-                />
+                <TableMenu connectionId={connectionId} type={type} table={t} onDropped={reload} />
               }
             />
           ))
@@ -309,22 +303,18 @@ function TableMenu({
   connectionId,
   type,
   table,
-  onStructure,
   onDropped
 }: {
   connectionId: string
   type: DbType
   table: TableInfo
-  onStructure: () => void
   onDropped: () => void
 }): React.JSX.Element {
   const view = table.type === 'view'
   return (
     <ContextMenuContent aria-label={`${table.name} ${view ? 'view' : 'table'}`}>
-      <ContextMenuItem onClick={() => viewData(connectionId, type, table)}>
-        View data
-      </ContextMenuItem>
-      <ContextMenuItem onClick={onStructure}>View structure</ContextMenuItem>
+      <ContextMenuItem onClick={() => viewData(table)}>View data</ContextMenuItem>
+      <ContextMenuItem onClick={() => viewStructure(table)}>View structure</ContextMenuItem>
       <ContextMenuSeparator />
       <ContextMenuItem onClick={() => copyName(table)}>Copy name</ContextMenuItem>
       <ContextMenuItem onClick={() => selectTop(type, table)}>

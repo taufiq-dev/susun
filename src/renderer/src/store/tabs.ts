@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { SqlFile } from '@shared/api'
 import type { Statement } from '@shared/split'
+import type { Filter, Order } from '@shared/sql'
 import type { QueryResult, TableRef } from '@shared/types'
 import {
   findPane,
@@ -68,7 +69,19 @@ export interface TableTabState {
   type: 'table'
   title: string
   table: TableRef
+  // What the tab shows: the table's rows, or its columns.
+  view: TableView
+  // Which page of rows (from 0), in what order and with what filter. Without an order the rows
+  // are in primary key order, where there is one.
+  page: number
+  order?: Order
+  filter?: Filter
 }
+
+export type TableView = 'data' | 'structure'
+
+// What the table tab can change about itself.
+export type TableTabChanges = Partial<Pick<TableTabState, 'view' | 'page' | 'order' | 'filter'>>
 
 export type Tab = QueryTabState | TableTabState
 
@@ -93,8 +106,10 @@ interface TabsState {
   openFile(file: SqlFile): void
   // The tab has been saved to the file, with this SQL.
   setFile(id: string, file: NonNullable<QueryTabState['file']>): void
-  // Activates the table's tab if it is open: the focused pane's, or else another pane's.
-  openTable(table: TableRef): void
+  // Activates the table's tab if it is open (the focused pane's, or else another pane's), showing
+  // `view` if given.
+  openTable(table: TableRef, view?: TableView): void
+  updateTable(id: string, changes: TableTabChanges): void
   // Activates the tab in its pane, and focuses the pane.
   activate(tabId: string): void
   focusPane(paneId: string): void
@@ -190,6 +205,14 @@ function newQueryTab(s: TabsState, sql = '', editorFraction = s.editorFraction):
   }
 }
 
+function updateTableTab(
+  s: TabsState,
+  id: string,
+  update: (tab: TableTabState) => TableTabState
+): Pick<TabsState, 'tabs'> {
+  return { tabs: s.tabs.map((t) => (t.id === id && t.type === 'table' ? update(t) : t)) }
+}
+
 function updateQueryTab(
   s: TabsState,
   id: string,
@@ -233,7 +256,7 @@ export const useTabs = create<TabsState>()((set) => ({
   setFile: (id, file) =>
     set((s) => updateQueryTab(s, id, (t) => ({ ...t, file, title: fileName(file.path) }))),
 
-  openTable: (table) =>
+  openTable: (table, view) =>
     set((s) => {
       const open = s.tabs.filter((t) => t.type === 'table' && sameTable(t.table, table))
       const focused = findPane(s.root, s.focusedPaneId)
@@ -241,6 +264,7 @@ export const useTabs = create<TabsState>()((set) => ({
       const pane = existing && paneOfTab(s.root, existing.id)
       if (existing && pane) {
         return {
+          ...(view && updateTableTab(s, existing.id, (t) => ({ ...t, view }))),
           root: updatePane(s.root, pane.id, (p) => ({ ...p, activeId: existing.id })),
           focusedPaneId: pane.id
         }
@@ -249,7 +273,9 @@ export const useTabs = create<TabsState>()((set) => ({
         id: crypto.randomUUID(),
         type: 'table',
         title: table.name,
-        table: { schema: table.schema, name: table.name }
+        table: { schema: table.schema, name: table.name },
+        view: view ?? 'data',
+        page: 0
       }
       return { tabs: [...s.tabs, tab], ...addTab(s, targetPane(s).id, tab.id) }
     }),
@@ -314,6 +340,8 @@ export const useTabs = create<TabsState>()((set) => ({
         focusedPaneId: paneId
       }
     }),
+
+  updateTable: (id, changes) => set((s) => updateTableTab(s, id, (t) => ({ ...t, ...changes }))),
 
   setSql: (id, sql) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, sql }))),
 

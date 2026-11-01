@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest'
-import { dropSql, qualifiedName, quoteIdent, selectTopSql, truncateSql } from './sql'
+import {
+  countSql,
+  dropSql,
+  qualifiedName,
+  quoteIdent,
+  selectPageSql,
+  selectTopSql,
+  truncateSql,
+  updateRowSql
+} from './sql'
 
 describe('quoteIdent', () => {
   it('quotes in each database’s style', () => {
@@ -43,5 +52,90 @@ describe('statements', () => {
     expect(truncateSql('postgres', orders)).toBe('truncate table "shop"."orders";')
     expect(truncateSql('mysql', { name: 'orders' })).toBe('truncate table `orders`;')
     expect(truncateSql('sqlite', { name: 'orders' })).toBe('delete from "orders";')
+  })
+})
+
+describe('table tab statements', () => {
+  const orders = { schema: 'shop', name: 'orders' }
+
+  it('selects a page in order', () => {
+    expect(
+      selectPageSql('postgres', orders, {
+        order: [{ column: 'id', direction: 'asc' }],
+        limit: 101,
+        offset: 200
+      })
+    ).toEqual({
+      sql: 'select * from "shop"."orders" order by "id" asc limit 101 offset 200',
+      params: []
+    })
+  })
+
+  it('filters with a parameter, numbered on Postgres', () => {
+    const page = {
+      filter: { column: 'total', operator: '>' as const, value: '10' },
+      order: [],
+      limit: 101,
+      offset: 0
+    }
+    expect(selectPageSql('postgres', orders, page)).toEqual({
+      sql: 'select * from "shop"."orders" where "total" > $1 limit 101 offset 0',
+      params: ['10']
+    })
+    expect(selectPageSql('mysql', { name: 'orders' }, page).sql).toBe(
+      'select * from `orders` where `total` > ? limit 101 offset 0'
+    )
+  })
+
+  it('matches contains and starts with as text, case-insensitively, with % and _ literal', () => {
+    const contains = { column: 'note', operator: 'contains' as const, value: '50%_off!' }
+    expect(countSql('postgres', orders, contains)).toEqual({
+      sql: `select count(*) from "shop"."orders" where "note"::text ilike $1 escape '!'`,
+      params: ['%50!%!_off!!%']
+    })
+    expect(countSql('mysql', { name: 'o' }, { ...contains, operator: 'starts with' })).toEqual({
+      sql: "select count(*) from `o` where cast(`note` as char) like ? escape '!'",
+      params: ['50!%!_off!!%']
+    })
+    expect(countSql('sqlite', { name: 'o' }, contains).sql).toBe(
+      `select count(*) from "o" where cast("note" as text) like ? escape '!'`
+    )
+  })
+
+  it('tests for NULL without a parameter', () => {
+    expect(
+      countSql('sqlite', { name: 'o' }, { column: 'note', operator: 'is null', value: '' })
+    ).toEqual({
+      sql: 'select count(*) from "o" where "note" is null',
+      params: []
+    })
+  })
+
+  it('updates a row by its key, with the values as parameters', () => {
+    expect(
+      updateRowSql(
+        'postgres',
+        orders,
+        [
+          { column: 'note', value: 'gift' },
+          { column: 'total', value: null }
+        ],
+        [
+          { column: 'id', value: 7 },
+          { column: 'line', value: '2' }
+        ]
+      )
+    ).toEqual({
+      sql: 'update "shop"."orders" set "note" = $1, "total" = $2 where "id" = $3 and "line" = $4',
+      params: ['gift', null, 7, '2']
+    })
+    expect(
+      updateRowSql(
+        'mysql',
+        { name: 'o' },
+        [{ column: 'a', value: 1 }],
+        [{ column: 'id', value: 2 }]
+      ).sql
+    ).toBe('update `o` set `a` = ? where `id` = ?')
   })
 })

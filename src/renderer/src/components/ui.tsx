@@ -144,12 +144,15 @@ interface SegmentedOption<T> {
 // A row of radio buttons styled as one control.
 export function Segmented<T extends string>({
   legend,
+  hideLegend = false,
   name,
   value,
   options,
   onChange
 }: {
   legend: string
+  // For screen readers only, where the options say what they choose between.
+  hideLegend?: boolean
   name: string
   value: T
   options: SegmentedOption<T>[]
@@ -157,7 +160,7 @@ export function Segmented<T extends string>({
 }): React.JSX.Element {
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-1 text-[12px] text-muted">{legend}</legend>
+      <legend className={hideLegend ? 'sr-only' : 'mb-1 text-[12px] text-muted'}>{legend}</legend>
       <div className="inline-flex rounded-[6px] border border-line bg-sunken p-0.5">
         {options.map((option) => {
           const checked = option.value === value

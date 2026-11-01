@@ -1,8 +1,6 @@
-import { splitStatements } from '@shared/split'
 import { dropSql, selectTopSql, truncateSql } from '@shared/sql'
 import type { DbType, TableInfo } from '@shared/types'
-import { runQuery } from '@renderer/features/query/run'
-import { focusedTab, sameTable, useTabs } from '@renderer/store/tabs'
+import { sameTable, useTabs } from '@renderer/store/tabs'
 
 // What a table's right-click menu in the Tables view does. Changes run on the connection's own
 // session, after a native confirmation; a failure is shown in a native dialog.
@@ -11,13 +9,14 @@ function shownName(table: TableInfo): string {
   return table.schema ? `${table.schema}.${table.name}` : table.name
 }
 
-// Opens a query tab on the table's first rows and runs it. (The table tab will show its data once
-// it can: plan step 11.)
-export function viewData(connectionId: string, type: DbType, table: TableInfo): void {
-  const sql = selectTopSql(type, table)
-  useTabs.getState().openQuery(undefined, sql)
-  const tab = focusedTab(useTabs.getState())
-  if (tab?.type === 'query') void runQuery(connectionId, tab.id, splitStatements(sql, type))
+// Opens the table's tab on its rows.
+export function viewData(table: TableInfo): void {
+  useTabs.getState().openTable(table, 'data')
+}
+
+// Opens the table's tab on its columns.
+export function viewStructure(table: TableInfo): void {
+  useTabs.getState().openTable(table, 'structure')
 }
 
 // Opens a query tab with a SELECT of the table's first rows, not run.

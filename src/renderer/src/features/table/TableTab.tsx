@@ -1,10 +1,19 @@
 import { useEffect, useState } from 'react'
 import type { ColumnInfo } from '@shared/types'
-import type { TableTabState } from '@renderer/store/tabs'
+import { Segmented } from '@renderer/components/ui'
+import { useSession } from '@renderer/store/session'
+import { useTabs, type TableTabState, type TableView } from '@renderer/store/tabs'
+import { TableData } from './TableData'
 
 type Loaded = { columns: ColumnInfo[] } | { error: string }
 
-// The table's columns for now; step 10 adds its rows in a grid.
+const VIEWS: { value: TableView; label: string }[] = [
+  { value: 'data', label: 'Data' },
+  { value: 'structure', label: 'Structure' }
+]
+
+// A table's tab: its rows (TableData) or its columns, as the switch in the header chooses. The
+// columns load either way, since the rows' order and the grid's headers use them.
 export function TableTab({
   tab,
   connectionId
@@ -13,6 +22,8 @@ export function TableTab({
   connectionId: string
 }): React.JSX.Element {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
+  const type = useSession((s) => s.session?.type ?? 'postgres')
+  const updateTable = useTabs((s) => s.updateTable)
   const { schema, name } = tab.table
 
   useEffect(() => {
@@ -26,22 +37,52 @@ export function TableTab({
     }
   }, [connectionId, schema, name])
 
+  const columns = loaded && 'columns' in loaded ? loaded.columns : null
+
   return (
-    <div className="h-full overflow-auto bg-surface">
-      <div className="px-5 pt-4 pb-3">
-        <h2 className="text-[15px] font-semibold select-text">
+    <div className="flex h-full flex-col bg-surface">
+      <div className="flex h-10 shrink-0 items-center gap-3 border-b border-line px-3">
+        <h2 className="min-w-0 truncate font-semibold select-text">
           {schema && <span className="font-normal text-muted">{schema}.</span>}
           {name}
         </h2>
-        {loaded && 'columns' in loaded && (
-          <p className="text-[12px] text-muted">
-            {loaded.columns.length} {loaded.columns.length === 1 ? 'column' : 'columns'}
-          </p>
+        {columns && (
+          <span className="shrink-0 text-[12px] text-muted">
+            {columns.length} {columns.length === 1 ? 'column' : 'columns'}
+          </span>
         )}
+        <div className="ml-auto">
+          <Segmented
+            legend="Show"
+            hideLegend
+            name={`table-view-${tab.id}`}
+            value={tab.view}
+            options={VIEWS}
+            onChange={(view) => updateTable(tab.id, { view })}
+          />
+        </div>
       </div>
-      {loaded === null && <p className="px-5 text-[12px] text-muted">Loading columns…</p>}
+      {tab.view === 'data' ? (
+        <TableData
+          tab={tab}
+          connectionId={connectionId}
+          type={type}
+          // If the columns can't be read, the rows still can, just without primary key order.
+          columns={loaded && 'error' in loaded ? [] : columns}
+        />
+      ) : (
+        <TableStructure loaded={loaded} />
+      )}
+    </div>
+  )
+}
+
+function TableStructure({ loaded }: { loaded: Loaded | null }): React.JSX.Element {
+  return (
+    <div className="min-h-0 flex-1 overflow-auto">
+      {loaded === null && <p className="px-5 py-3 text-[12px] text-muted">Loading columns…</p>}
       {loaded && 'error' in loaded && (
-        <p className="px-5 text-[12px] text-danger select-text">{loaded.error}</p>
+        <p className="px-5 py-3 text-[12px] text-danger select-text">{loaded.error}</p>
       )}
       {loaded && 'columns' in loaded && (
         <table className="w-full border-collapse text-left select-text">
