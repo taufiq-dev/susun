@@ -341,7 +341,8 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     - Saved queries: the connection's `.sql` files, most recently used first, with their folder; one
       that's moved or deleted shows as missing; × takes it off the list; a folder button opens a file.
     - Recent queries: each finished run (the SQL as written, when, how it went, how long), newest first,
-      filterable; clicking one opens its SQL in a new tab; the bin clears the history after a second click.
+      filterable; double-clicking one (or Enter) opens its SQL in a new tab, and a click only selects it; the bin
+      clears the history after a second click.
     - The connection bar: the name and type; its menu opens upward with Disconnect, Edit connection, and
       Switch connection, a submenu of the other saved connections, most recently used first, and All
       connections…. Switching asks about unsaved SQL ("before switching connections"), connects to the

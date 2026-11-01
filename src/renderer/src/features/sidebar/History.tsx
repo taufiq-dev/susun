@@ -12,11 +12,14 @@ type Loaded = { entries: HistoryEntry[] } | { error: string }
 const ITEM = 'button[data-entry]'
 
 // The sidebar's Recent queries view: this connection's runs, newest first (the last 1,000).
-// Clicking one opens its SQL in a new query tab. Clearing asks for a second click.
+// Clicking one selects it (as do the arrow keys); double-clicking it, or Enter, opens its SQL in a
+// new query tab, so a click to look at an entry doesn't open a tab. Clearing asks for a second
+// click.
 export function History({ connectionId }: { connectionId: string }): React.JSX.Element {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [filter, setFilter] = useState('')
   const [confirmingClear, setConfirmingClear] = useState(false)
+  const [selectedId, setSelectedId] = useState<number | null>(null)
   const version = useLibrary((s) => s.history)
   const openQuery = useTabs((s) => s.openQuery)
   const list = useRef<HTMLDivElement>(null)
@@ -43,6 +46,8 @@ export function History({ connectionId }: { connectionId: string }): React.JSX.E
   const needle = filter.trim().toLowerCase()
   const entries = loaded && 'entries' in loaded ? loaded.entries : []
   const shown = needle ? entries.filter((e) => e.sql.toLowerCase().includes(needle)) : entries
+  // The list's one Tab stop: the selected entry, or the first if it is filtered out or gone.
+  const tabStop = shown.find((e) => e.id === selectedId) ?? shown[0]
 
   return (
     <section aria-label="Recent queries" className="flex min-h-0 flex-1 flex-col">
@@ -101,16 +106,27 @@ export function History({ connectionId }: { connectionId: string }): React.JSX.E
         {entries.length > 0 && shown.length === 0 && (
           <p className="px-3 text-[12px] text-muted">No recent queries match “{filter.trim()}”.</p>
         )}
-        <ul>
-          {shown.map((entry, i) => (
-            <li key={entry.id}>
+        <ul role="listbox" aria-label="Recent queries">
+          {shown.map((entry) => (
+            <li key={entry.id} role="none">
               <button
                 type="button"
+                role="option"
                 data-entry
-                tabIndex={i === 0 ? 0 : -1}
+                aria-selected={entry.id === selectedId}
+                tabIndex={entry === tabStop ? 0 : -1}
                 title={entry.sql.slice(0, 2000)}
-                onClick={() => openQuery(undefined, entry.sql)}
-                className="focus-ring flex w-full flex-col gap-0.5 border-b border-line/60 px-3 py-1.5 text-left hover:bg-surface/70"
+                onFocus={() => setSelectedId(entry.id)}
+                onClick={() => setSelectedId(entry.id)}
+                onDoubleClick={() => openQuery(undefined, entry.sql)}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return
+                  e.preventDefault()
+                  openQuery(undefined, entry.sql)
+                }}
+                className={`focus-ring flex w-full flex-col gap-0.5 border-b border-line/60 px-3 py-1.5 text-left ${
+                  entry.id === selectedId ? 'bg-accent/15' : 'hover:bg-surface/70'
+                }`}
               >
                 <span className="line-clamp-2 font-mono text-[12px] break-all whitespace-pre-wrap">
                   {entry.sql}
