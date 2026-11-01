@@ -5,9 +5,30 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Open decisions (ask the user before acting)
 
-- **License for Trowel** (MIT, GPLv3 or closed): needed before distributing it (step 12).
+- **License for Trowel** (MIT, GPLv3 or closed): needed before distributing it (step 13).
 
 ## Decided
+
+- **Split panes, as in VS Code.** The tab area splits right or down, nested, into resizable panes, each with
+  its own tabs; tabs move between panes by dragging, or onto a pane's edge to split it. One of the reasons
+  for building Trowel: Beekeeper Studio shows one tab at a time.
+- **Each query tab has its own database session**, opened on its first run and closed with the tab; the
+  sidebar and table tabs share the connection's own session. Sharing one session was already wrong with one
+  tab visible (measured on Postgres with two tabs running: Cancel in tab B stopped tab A's query and B's ran
+  on; a statement from tab B ran inside the transaction tab A had opened). Own sessions let tabs run side
+  by side, make Cancel stop only its tab, and keep BEGIN, temp tables and SET in their tab. Costs: one
+  server connection per query tab that has run, about 2 MB on a Postgres server (measured) and a slot of
+  its `max_connections`, which on a production database it shares with the application; on SQLite one more
+  process, about 15 MB (measured), and a tab holding a write transaction makes other tabs' writes wait
+  (better-sqlite3's 5-second busy timeout, then "database is locked"). Opening one took 32 ms on local
+  Postgres and 61 ms on SQLite. No extra compute: idle sessions run nothing (Trowel sends no keepalive
+  queries), and a serverless database (Neon, Aurora Serverless v2) is kept awake by any open connection,
+  which the connection's own session already is. Uncommitted work in a tab isn't seen by other tabs, table
+  tabs or the sidebar. Not done: closing sessions that have been idle a while (would free connection slots,
+  and let a serverless database scale to zero, at the cost of the session's state).
+- **One connection per window.** Panes split the tabs of the window's connection; a New Window command opens
+  another connection beside it. Tabs record their connection, so mixing connections in one window could be
+  added later (the sidebar, the session store and the accent would need to know about several).
 
 - **No Beekeeper Studio code.** None of it is copied or ported, GPLv3 or commercial. The clone is only for
   seeing how it approaches a problem.
@@ -36,8 +57,9 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   `NODE_EXTRA_CA_CERTS`; a CA installed in the macOS keychain is untested.
 
 - **Row limit: keep the first 10,000 rows of each statement, no "load more".** Loading more later would
-  mean holding the query open between clicks: on Postgres that blocks the connection every tab shares and
-  keeps a transaction open, and mysql2 can't do it at all. Re-running with a higher limit would repeat a
+  mean holding the query open between clicks: on Postgres that keeps a transaction open (holding its locks
+  and snapshot) and the session busy, which was then the connection every tab shared and since step 10a is
+  the tab's own, and mysql2 can't do it at all. Re-running with a higher limit would repeat a
   statement's changes. The table tab pages with its own `LIMIT`; getting every row of a big query would be
   an export to a file, not planned yet.
 
@@ -87,7 +109,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   Linux without a keyring, where `save` throws). Done. Also: `api.dialog.openSqliteFile()` for the file picker,
   double-click on a saved connection connects, a two-click delete, and per-database-type accent colours (see
   CLAUDE.md). The query tab is a plain text area and the table tab lists the table's columns, until steps 9
-  and 10; the row panel is a placeholder (step 11) that the header button hides. Replaced the template's demo UI
+  and 11; the row panel is a placeholder (step 12) that the header button hides. Replaced the template's demo UI
   and `ping` handler; the window is now 1280x800 (min 960x600). Tested by driving the built app over the
   DevTools protocol, with screenshots in light and dark; the native file picker is untested.
   Not done: resizable panes, keyboard shortcuts for tabs (Cmd+W would need a custom app menu, since the default
@@ -144,15 +166,42 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     MariaDB and SQLite INSERT ... RETURNING) still changes all 25,000; types, params, transactions across calls,
     VACUUM and CREATE INDEX CONCURRENTLY work through the cursor; Cancel works during a Postgres cursor read and
     while MariaDB streams 100 million rows.
-- [ ] **10. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
+- [ ] **10. Panes and sessions** — in four parts, each committed on its own (see "Decided").
+  - [x] **10a. A session per query tab** — `api.db.openSession`/`closeSession`; `query` and `cancel` take a
+    session id (or a connection id, for the connection's own session). A query tab opens its session on its
+    first run and closes it with the tab, which stops a query still running there; disconnecting or closing
+    the window closes them all. The status says "Connecting…" while a tab's session opens; if it can't open,
+    "Couldn't connect" and the server's error, with nothing run (the next run tries again). Cancel while
+    connecting stops the run once the session is open. An in-memory SQLite database (`:memory:`) has only
+    the connection's session, which its tabs share. Tested in the built app against Postgres 18, MariaDB 13
+    and SQLite, checking the server's own list of sessions: one session after connecting, one more per query
+    tab that has run; a 1 s query in one tab finished in 1 s while another tab ran a 3 s one; Cancel in one
+    tab left the other tab's query running to the end; a row inserted in a tab's open transaction wasn't
+    seen by another tab until COMMIT; `SET`, MySQL `USE` and SQLite temp tables stayed in their tab, and a
+    temp table survived a SQLite Cancel in another tab; closing a tab mid-query ended its session and the
+    query on the server; reloading and disconnecting (also mid-query) closed every session; a role limited
+    to one connection showed "Couldn't connect: too many connections for role" in its tab while the sidebar
+    worked; a SQLite write behind another tab's open write transaction failed after 5.4 s with "database is
+    locked", and worked after that tab committed. The step 9 tests still pass, including both dump restores.
+    Not done: noticing a session that died (a server restart, a network drop, a serverless database scaling
+    to zero); the tab then shows the driver's error on each run until it is closed, as the connection's own
+    session already did.
+  - [ ] **10b. Split panes** — the tabs store becomes a tree of panes, each with its tabs and active tab;
+    split right or down (also from the tab bar), nested, resizable; one pane is focused, and that is where
+    New query, the sidebar and the row panel act. Closing a pane's last tab removes the pane.
+  - [ ] **10c. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
+  - [ ] **10d. New Window** — opens another connect screen in a new window (a custom app menu, which also
+    allows Cmd+W for tabs).
+- [ ] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a
-  primary key are read-only.
-- [ ] **11. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`
+  primary key are read-only. Table tabs share the connection's own session, so a save's transaction must not
+  interleave with other table tabs' queries: give the save a session of its own, or queue the others.
+- [ ] **12. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`
   (folding included), plus a key filter box. Build the row object from `columns` (suffix repeated names, e.g.
   `id`, `id_2`). Convert first: `Uint8Array` → hex, Postgres `bigint` arrives as a
   string, dates → ISO strings. Postgres/MySQL JSON columns arrive parsed and show as nested objects.
-- [ ] **12. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
+- [ ] **13. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
   Developer account for signing and notarization. Check that SQLite works in the packaged app: its utility
   process (`sqlite.process.ts`) loads the native `better-sqlite3` from inside the asar, untested so far. Settle the app name (`trowel` now) before anyone relies on

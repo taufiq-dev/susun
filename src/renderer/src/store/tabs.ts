@@ -22,6 +22,10 @@ export interface QueryRun {
   cancelling?: boolean
   // Why asking to cancel failed, if it did.
   cancelError?: string
+  // The tab's session is being opened, before the first statement runs.
+  connecting?: boolean
+  // Why the tab's session couldn't be opened, in which case no statement ran.
+  connectError?: string
   // What the results pane shows, once chosen: a statement's rows (its index in `statements`) or
   // the list of statements.
   view?: number | 'statements'
@@ -33,6 +37,8 @@ export interface QueryTabState {
   title: string
   sql: string
   run?: QueryRun
+  // The tab's own database session (see `DbApi.openSession`), once its first run has opened it.
+  sessionId?: string
 }
 
 export interface TableTabState {
@@ -55,9 +61,10 @@ interface TabsState {
   activate(id: string): void
   close(id: string): void
   setSql(id: string, sql: string): void
-  // Both do nothing if the tab has been closed.
+  // These do nothing if the tab has been closed.
   setRun(id: string, run: QueryRun): void
   setRunView(id: string, view: NonNullable<QueryRun['view']>): void
+  setSession(id: string, sessionId: string): void
   reset(): void
 }
 
@@ -118,6 +125,11 @@ export const useTabs = create<TabsState>()((set) => ({
       tabs: s.tabs.map((t) =>
         t.id === id && t.type === 'query' && t.run ? { ...t, run: { ...t.run, view } } : t
       )
+    })),
+
+  setSession: (id, sessionId) =>
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? { ...t, sessionId } : t))
     })),
 
   reset: () => set({ tabs: [], activeId: null, queryCount: 0 })

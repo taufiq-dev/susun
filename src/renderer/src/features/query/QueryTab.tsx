@@ -120,7 +120,7 @@ export function QueryTab({
         />
         {tab.run?.state === 'running' ? (
           <Button
-            onClick={() => cancelRun(connectionId, tab.id)}
+            onClick={() => cancelRun(tab.id)}
             disabled={tab.run.cancelling}
             title="Stop the running statement; the statements after it don’t run"
             className="min-w-20"

@@ -8,6 +8,7 @@ import {
   type WebContents
 } from 'electron'
 import type { ConnectionsApi, DbApi, DialogApi, IpcResult } from '@shared/api'
+import type { ConnectionConfig } from '@shared/types'
 import { listConnections, removeConnection, saveConnection } from './connections'
 import { createClient, type DbClient } from './db'
 
@@ -19,25 +20,54 @@ type Handlers<T> = {
     : never
 }
 
+// An open connection: the config it was opened with, its own session's client (which the sidebar
+// and table tabs use) and the ids of the sessions opened on it, which query tabs use.
 interface OpenConnection {
+  config: ConnectionConfig
   client: DbClient
   owner: WebContents
+  sessions: Set<string>
+}
+
+interface OpenSession {
+  client: DbClient
+  connectionId: string
 }
 
 const openConnections = new Map<string, OpenConnection>()
+const openSessions = new Map<string, OpenSession>()
 const watchedOwners = new WeakSet<WebContents>()
 
-function client(connectionId: string): DbClient {
-  const open = openConnections.get(connectionId)
-  if (!open) throw new Error('Connection is closed')
-  return open.client
+// The client of a session, or of a connection's own session.
+function findClient(id: string): DbClient | undefined {
+  return openSessions.get(id)?.client ?? openConnections.get(id)?.client
 }
 
-function close(connectionId: string): Promise<void> {
+function client(id: string): DbClient {
+  const client = findClient(id)
+  if (!client) throw new Error('Connection is closed')
+  return client
+}
+
+function closeSession(sessionId: string): Promise<void> {
+  const session = openSessions.get(sessionId)
+  if (!session) return Promise.resolve()
+  openSessions.delete(sessionId)
+  openConnections.get(session.connectionId)?.sessions.delete(sessionId)
+  return session.client.disconnect()
+}
+
+// Closes the connection's sessions along with it, all at once.
+async function close(connectionId: string): Promise<void> {
   const open = openConnections.get(connectionId)
-  if (!open) return Promise.resolve()
+  if (!open) return
   openConnections.delete(connectionId)
-  return open.client.disconnect()
+  const results = await Promise.allSettled([
+    open.client.disconnect(),
+    ...[...open.sessions].map(closeSession)
+  ])
+  const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
+  if (failed) throw failed.reason
 }
 
 // A window that closes or reloads loses its connection ids, so close its connections with it.
@@ -59,16 +89,34 @@ const db: Handlers<DbApi> = {
     const client = createClient(config)
     await client.connect()
     const id = randomUUID()
-    openConnections.set(id, { client, owner: event.sender })
+    openConnections.set(id, { config, client, owner: event.sender, sessions: new Set() })
     watchOwner(event.sender)
     return id
   },
   disconnect: (_event, connectionId) => close(connectionId),
+  async openSession(_event, connectionId) {
+    const open = openConnections.get(connectionId)
+    if (!open) throw new Error('Connection is closed')
+    // A second connection to ':memory:' would be a new, empty database.
+    if (open.config.type === 'sqlite' && open.config.file === ':memory:') return connectionId
+    const client = createClient(open.config)
+    await client.connect()
+    // Disconnected (or the window closed) while this was connecting.
+    if (openConnections.get(connectionId) !== open) {
+      await client.disconnect()
+      throw new Error('Connection is closed')
+    }
+    const id = randomUUID()
+    openSessions.set(id, { client, connectionId })
+    open.sessions.add(id)
+    return id
+  },
+  closeSession: (_event, sessionId) => closeSession(sessionId),
   listTables: (_event, connectionId) => client(connectionId).listTables(),
   listColumns: (_event, connectionId, table) => client(connectionId).listColumns(table),
-  query: (_event, connectionId, sql, params) => client(connectionId).query(sql, params),
-  cancel: async (_event, connectionId) => {
-    await openConnections.get(connectionId)?.client.cancel()
+  query: (_event, sessionId, sql, params) => client(sessionId).query(sql, params),
+  cancel: async (_event, sessionId) => {
+    await findClient(sessionId)?.cancel()
   }
 }
 

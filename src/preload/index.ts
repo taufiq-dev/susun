@@ -13,10 +13,12 @@ const api: Api = {
   db: {
     connect: (config) => invoke('db:connect', config),
     disconnect: (connectionId) => invoke('db:disconnect', connectionId),
+    openSession: (connectionId) => invoke('db:openSession', connectionId),
+    closeSession: (sessionId) => invoke('db:closeSession', sessionId),
     listTables: (connectionId) => invoke('db:listTables', connectionId),
     listColumns: (connectionId, table) => invoke('db:listColumns', connectionId, table),
-    query: (connectionId, sql, params) => invoke('db:query', connectionId, sql, params),
-    cancel: (connectionId) => invoke('db:cancel', connectionId)
+    query: (sessionId, sql, params) => invoke('db:query', sessionId, sql, params),
+    cancel: (sessionId) => invoke('db:cancel', sessionId)
   },
   connections: {
     list: () => invoke('connections:list'),

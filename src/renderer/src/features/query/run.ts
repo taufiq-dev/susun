@@ -1,5 +1,5 @@
 import type { Statement } from '@shared/split'
-import { useTabs, type QueryRun, type StatementRun } from '@renderer/store/tabs'
+import { useTabs, type QueryRun, type QueryTabState, type StatementRun } from '@renderer/store/tabs'
 
 // While a script runs, its progress is written to the store at most this often, so a script of
 // thousands of quick statements doesn't re-render for each one.
@@ -9,49 +9,83 @@ let lastRunId = 0
 // Runs that Cancel has been asked to stop.
 const cancelled = new Set<number>()
 
-function currentRun(tabId: string): QueryRun | undefined {
+function queryTab(tabId: string): QueryTabState | undefined {
   const tab = useTabs.getState().tabs.find((t) => t.id === tabId)
-  return tab?.type === 'query' ? tab.run : undefined
+  return tab?.type === 'query' ? tab : undefined
 }
 
 function isOpen(tabId: string): boolean {
   return useTabs.getState().tabs.some((t) => t.id === tabId)
 }
 
-// Runs a query tab's statements one at a time, stopping at the first error or at Cancel, and
-// records the run in the tabs store so it isn't lost when the tab's component unmounts. Does
-// nothing without statements, or while the tab's last run is going. Stops if the tab is closed.
+function closeQuietly(sessionId: string): void {
+  window.api.db.closeSession(sessionId).catch((err: Error) => {
+    console.error('closing a session failed:', err.message)
+  })
+}
+
+// The tab's session, opened on its first run. Null if the tab was closed while it opened.
+async function tabSession(connectionId: string, tabId: string): Promise<string | null> {
+  const existing = queryTab(tabId)?.sessionId
+  if (existing) return existing
+  const sessionId = await window.api.db.openSession(connectionId)
+  if (!isOpen(tabId)) {
+    closeQuietly(sessionId)
+    return null
+  }
+  useTabs.getState().setSession(tabId, sessionId)
+  return sessionId
+}
+
+// Runs a query tab's statements one at a time in the tab's own session, stopping at the first
+// error or at Cancel, and records the run in the tabs store so it isn't lost when the tab's
+// component unmounts. Does nothing without statements, or while the tab's last run is going.
+// Stops if the tab is closed.
 export async function runQuery(
   connectionId: string,
   tabId: string,
   statements: Statement[]
 ): Promise<void> {
-  const tab = useTabs.getState().tabs.find((t) => t.id === tabId)
-  if (tab?.type !== 'query' || tab.run?.state === 'running' || statements.length === 0) return
+  const tab = queryTab(tabId)
+  if (!tab || tab.run?.state === 'running' || statements.length === 0) return
 
   const id = ++lastRunId
   const ran: StatementRun[] = []
+  let connecting = !tab.sessionId
   // Keeps what the user changed meanwhile: the result shown, a failed cancel.
-  const record = (state: QueryRun['state']): void => {
-    const current = currentRun(tabId)
+  const record = (state: QueryRun['state'], connectError?: string): void => {
+    const current = queryTab(tabId)?.run
     useTabs.getState().setRun(tabId, {
       ...(current?.id === id ? current : {}),
       id,
       state,
       total: statements.length,
       statements: [...ran],
-      cancelling: state === 'running' && cancelled.has(id)
+      cancelling: state === 'running' && cancelled.has(id),
+      connecting: state === 'running' && connecting,
+      connectError
     })
   }
 
   record('running')
-  let recordedAt = performance.now()
   try {
+    let sessionId: string | null
+    try {
+      sessionId = await tabSession(connectionId, tabId)
+    } catch (err) {
+      return record('failed', (err as Error).message)
+    }
+    if (!sessionId) return
+    if (connecting) {
+      connecting = false
+      record('running')
+    }
+    let recordedAt = performance.now()
     for (const statement of statements) {
       if (!isOpen(tabId)) return
       if (cancelled.has(id)) return record('cancelled')
       try {
-        ran.push({ ...statement, result: await window.api.db.query(connectionId, statement.sql) })
+        ran.push({ ...statement, result: await window.api.db.query(sessionId, statement.sql) })
       } catch (err) {
         const stopped = cancelled.has(id)
         ran.push({
@@ -74,18 +108,31 @@ export async function runQuery(
   }
 }
 
-// Stops the tab's run: the running statement is cancelled on the server, and no more start.
-export function cancelRun(connectionId: string, tabId: string): void {
-  const run = currentRun(tabId)
-  if (run?.state !== 'running' || cancelled.has(run.id)) return
+// Stops the tab's run: the running statement is cancelled on the server, and no more start. While
+// the tab's session is still opening, the run stops once it has opened.
+export function cancelRun(tabId: string): void {
+  const tab = queryTab(tabId)
+  const run = tab?.run
+  if (!tab || run?.state !== 'running' || cancelled.has(run.id)) return
   cancelled.add(run.id)
   useTabs.getState().setRun(tabId, { ...run, cancelling: true, cancelError: undefined })
-  window.api.db.cancel(connectionId).catch((err: Error) => {
+  if (!tab.sessionId) return
+  window.api.db.cancel(tab.sessionId).catch((err: Error) => {
     // The run goes on; let the user try again.
     cancelled.delete(run.id)
-    const current = currentRun(tabId)
+    const current = queryTab(tabId)?.run
     if (current?.id === run.id && current.state === 'running') {
       useTabs.getState().setRun(tabId, { ...current, cancelling: false, cancelError: err.message })
     }
   })
+}
+
+// For a query tab being closed: closes its session, which stops a query still running there. The
+// tabs of an in-memory SQLite database share the connection's session, which stays open, so there
+// it only cancels the tab's run.
+export function endSession(connectionId: string, tabId: string): void {
+  const sessionId = queryTab(tabId)?.sessionId
+  if (!sessionId) return
+  if (sessionId === connectionId) cancelRun(tabId)
+  else closeQuietly(sessionId)
 }

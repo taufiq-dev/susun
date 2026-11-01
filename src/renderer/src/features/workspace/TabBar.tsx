@@ -1,6 +1,6 @@
 import { CloseIcon, PlusIcon } from '@renderer/components/icons'
 import { IconButton } from '@renderer/components/ui'
-import { cancelRun } from '@renderer/features/query/run'
+import { endSession } from '@renderer/features/query/run'
 import { useSession } from '@renderer/store/session'
 import { useTabs } from '@renderer/store/tabs'
 
@@ -11,9 +11,8 @@ export function TabBar(): React.JSX.Element {
   const closeTab = useTabs((s) => s.close)
   const connectionId = useSession((s) => s.session?.connectionId)
 
-  // A query still running in the tab would keep the connection busy, so stop it.
   const close = (id: string): void => {
-    if (connectionId) cancelRun(connectionId, id)
+    if (connectionId) endSession(connectionId, id)
     closeTab(id)
   }
   const openQuery = useTabs((s) => s.openQuery)

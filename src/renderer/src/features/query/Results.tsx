@@ -59,6 +59,7 @@ export function RunStatus({ run }: { run?: QueryRun }): React.JSX.Element | null
   const done = run.statements.length
   if (run.state === 'running') {
     if (run.cancelling) return <span className="text-muted">Cancelling…</span>
+    if (run.connecting) return <span className="text-muted">Connecting…</span>
     return (
       <span className="text-muted">
         {run.total === 1 ? 'Running…' : `Running statement ${done + 1} of ${run.total}…`}
@@ -72,7 +73,7 @@ export function RunStatus({ run }: { run?: QueryRun }): React.JSX.Element | null
     const last = run.statements[done - 1]
     return (
       <span className="text-muted">
-        {run.total === 1
+        {run.total === 1 || done === 0
           ? 'Cancelled'
           : last && 'error' in last
             ? `Statement ${done} of ${run.total} cancelled`
@@ -80,6 +81,7 @@ export function RunStatus({ run }: { run?: QueryRun }): React.JSX.Element | null
       </span>
     )
   }
+  if (run.connectError) return <span className="text-danger">Couldn’t connect</span>
   if (run.state === 'failed') {
     return (
       <span className="text-danger">
@@ -130,27 +132,52 @@ export function Results({
       </Message>
     )
   }
+  if (run.connectError) {
+    return (
+      <ErrorPanel
+        title="Couldn’t open a session for this tab, so nothing ran"
+        error={run.connectError}
+      />
+    )
+  }
   if (run.total === 1) return <SingleResult run={run} />
   return <ScriptResults run={run} onView={onView} onShowStatement={onShowStatement} />
 }
 
+function ErrorPanel({
+  title,
+  error,
+  muted
+}: {
+  title: string
+  error: string
+  // For a cancelled query, which isn't a failure.
+  muted?: boolean
+}): React.JSX.Element {
+  return (
+    <div className="h-full overflow-auto px-4 py-3">
+      <p className={`mb-1 font-medium ${muted ? '' : 'text-danger'}`}>{title}</p>
+      <pre
+        className={`font-mono text-[12px] whitespace-pre-wrap select-text ${muted ? 'text-muted' : 'text-ink'}`}
+      >
+        {error}
+      </pre>
+    </div>
+  )
+}
+
 function SingleResult({ run }: { run: QueryRun }): React.JSX.Element {
   const s = run.statements[0]
-  if (!s) return <Message>Running…</Message>
+  if (!s) {
+    // Cancelled while the tab's session was opening.
+    if (run.state === 'cancelled') return <Message>Cancelled before the query started.</Message>
+    return <Message>Running…</Message>
+  }
   if ('error' in s) {
-    return (
-      <div className="h-full overflow-auto px-4 py-3">
-        {s.cancelled ? (
-          <p className="mb-1 font-medium">The query was cancelled</p>
-        ) : (
-          <p className="mb-1 font-medium text-danger">The query failed</p>
-        )}
-        <pre
-          className={`font-mono text-[12px] whitespace-pre-wrap select-text ${s.cancelled ? 'text-muted' : 'text-ink'}`}
-        >
-          {s.error}
-        </pre>
-      </div>
+    return s.cancelled ? (
+      <ErrorPanel title="The query was cancelled" error={s.error} muted />
+    ) : (
+      <ErrorPanel title="The query failed" error={s.error} />
     )
   }
   if (s.result.columns.length === 0) return <Message>The statement returned no rows.</Message>
