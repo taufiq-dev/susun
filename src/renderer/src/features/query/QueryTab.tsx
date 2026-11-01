@@ -3,7 +3,6 @@ import { closeCompletion } from '@codemirror/autocomplete'
 import CodeMirror, { Prec, keymap, type ReactCodeMirrorRef } from '@uiw/react-codemirror'
 import type { DbType } from '@shared/types'
 import { Button } from '@renderer/components/ui'
-import { useLayout } from '@renderer/store/layout'
 import { useTabs, type QueryTabState } from '@renderer/store/tabs'
 import { editorLook, sqlLanguage, statementsToRun } from './editor'
 import { Results, RunStatus } from './Results'
@@ -24,8 +23,9 @@ export function QueryTab({
 }): React.JSX.Element {
   const setSql = useTabs((s) => s.setSql)
   const setRunView = useTabs((s) => s.setRunView)
-  const editorFraction = useLayout((s) => s.editorFraction)
-  const setEditorFraction = useLayout((s) => s.setEditorFraction)
+  const setFraction = useTabs((s) => s.setEditorFraction)
+  const editorFraction = tab.editorFraction
+  const setEditorFraction = (fraction: number): void => setFraction(tab.id, fraction)
   const editor = useRef<ReactCodeMirrorRef>(null)
   const container = useRef<HTMLDivElement>(null)
 

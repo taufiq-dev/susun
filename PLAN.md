@@ -166,7 +166,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     MariaDB and SQLite INSERT ... RETURNING) still changes all 25,000; types, params, transactions across calls,
     VACUUM and CREATE INDEX CONCURRENTLY work through the cursor; Cancel works during a Postgres cursor read and
     while MariaDB streams 100 million rows.
-- [ ] **10. Panes and sessions** — in four parts, each committed on its own (see "Decided").
+- [ ] **10. Panes and sessions** — in five parts, each committed on its own (see "Decided").
   - [x] **10a. A session per query tab** — `api.db.openSession`/`closeSession`; `query` and `cancel` take a
     session id (or a connection id, for the connection's own session). A query tab opens its session on its
     first run and closes it with the tab, which stops a query still running there; disconnecting or closing
@@ -186,11 +186,27 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     Not done: noticing a session that died (a server restart, a network drop, a serverless database scaling
     to zero); the tab then shows the driver's error on each run until it is closed, as the connection's own
     session already did.
-  - [ ] **10b. Split panes** — the tabs store becomes a tree of panes, each with its tabs and active tab;
-    split right or down (also from the tab bar), nested, resizable; one pane is focused, and that is where
-    New query, the sidebar and the row panel act. Closing a pane's last tab removes the pane.
-  - [ ] **10c. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
-  - [ ] **10d. New Window** — opens another connect screen in a new window (a custom app menu, which also
+  - [x] **10b. Split panes** — the tabs store holds a tree of panes (`store/panes.ts`), each with its tabs and
+    active tab; splits run side by side or one above another, nested, with draggable splitters (also moved
+    with the arrow keys; a pane isn't resized below 160 px wide or 100 px tall). One pane is focused (the
+    accent line on its active tab): New query and the sidebar act on it. As in VS Code, Split (the tab bar's
+    button, Alt-click for down, `Cmd+\`, or the tab's right-click menu) opens a copy of the tab in a new pane:
+    a query tab with the same SQL, or the same table; "Move to a new pane on the right / below" in the menu
+    moves it instead. New panes in a split of equal panes even them out, otherwise they take half the pane
+    split (VS Code's default). `Cmd+1` to `Cmd+9` focus a pane. Closing a pane's last tab removes the pane.
+    Opening a table already open in another pane goes to that pane. The editor's share of a query tab is now
+    per tab (new ones start with the last share set); `store/layout.ts` is gone. Tested in the built app
+    against Postgres: two queries in two panes ran at once (two 2 s queries done in 2.0 s); split, move,
+    the menu (moves disabled for a pane's only tab; Escape closes it), a query still running when its tab
+    moved to a new pane finished there, `Cmd+1`/`Cmd+3`/`Cmd+\`, dragging and arrow keys on a splitter,
+    closing a pane's only tab (its session closed too), and disconnecting back to one empty pane; the tree
+    functions have 11 unit tests. The 10a session tests and the 9a query tests still pass.
+  - [ ] **10c. One results panel** — the user's choice: the results move out of each query tab into one panel
+    across the bottom of the tab area, showing the results of the focused pane's query tab (with its name, so
+    it's clear whose they are); Run, Cancel and the status stay under each editor. Two results can't be seen
+    at once.
+  - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
+  - [ ] **10e. New Window** — opens another connect screen in a new window (a custom app menu, which also
     allows Cmd+W for tabs).
 - [ ] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect

@@ -1,6 +1,19 @@
 import { create } from 'zustand'
 import type { Statement } from '@shared/split'
 import type { QueryResult, TableRef } from '@shared/types'
+import {
+  findPane,
+  insertPane,
+  newPane,
+  paneOfTab,
+  panesOf,
+  removePane,
+  resizeSplit,
+  updatePane,
+  type LayoutNode,
+  type Pane,
+  type Side
+} from './panes'
 
 // One statement of a run, with where it is in the editor and how it went. `cancelled` marks the
 // error of a statement stopped by Cancel.
@@ -8,7 +21,7 @@ export type StatementRun = Statement &
   ({ result: QueryResult } | { error: string; cancelled?: boolean })
 
 // The latest run of a query tab. It lives here rather than in the tab's component, which unmounts
-// when another tab is activated. `id` is new for each run.
+// when another tab is activated in its pane, or the tab moves to another pane. `id` is new for each run.
 export interface QueryRun {
   id: number
   state: 'running' | 'done' | 'failed' | 'cancelled'
@@ -39,6 +52,8 @@ export interface QueryTabState {
   run?: QueryRun
   // The tab's own database session (see `DbApi.openSession`), once its first run has opened it.
   sessionId?: string
+  // The editor's share of the tab's height; the results get the rest.
+  editorFraction: number
 }
 
 export interface TableTabState {
@@ -52,15 +67,32 @@ export type Tab = QueryTabState | TableTabState
 
 interface TabsState {
   tabs: Tab[]
-  activeId: string | null
+  // How the tab area is split into panes, and each pane's tabs.
+  root: LayoutNode
+  // The pane that New query and the sidebar open tabs in, and whose active tab the sidebar
+  // highlights. Clicking in a pane focuses it.
+  focusedPaneId: string
   // Numbers new query tabs: "Query 1", "Query 2", ...
   queryCount: number
-  openQuery(): void
-  // Activates the table's tab if it is already open.
+  // The editor share a new query tab starts with: the last one set.
+  editorFraction: number
+  // In the given pane, or else the focused one.
+  openQuery(paneId?: string): void
+  // Activates the table's tab if it is open: the focused pane's, or else another pane's.
   openTable(table: TableRef): void
-  activate(id: string): void
-  close(id: string): void
+  // Activates the tab in its pane, and focuses the pane.
+  activate(tabId: string): void
+  focusPane(paneId: string): void
+  // Closing a pane's last tab removes the pane, unless it is the only one.
+  close(tabId: string): void
+  // Opens a copy of the tab in a new pane on `side` of the tab's pane: a table tab on the same
+  // table, or a new query tab with the same SQL (and, once it runs, its own session).
+  split(tabId: string, side: Side): void
+  // Moves the tab into a new pane on `side` of its pane, unless it is the pane's only tab.
+  moveToNewPane(tabId: string, side: Side): void
+  resize(splitId: string, sizes: number[]): void
   setSql(id: string, sql: string): void
+  setEditorFraction(id: string, fraction: number): void
   // These do nothing if the tab has been closed.
   setRun(id: string, run: QueryRun): void
   setRunView(id: string, view: NonNullable<QueryRun['view']>): void
@@ -68,69 +100,178 @@ interface TabsState {
   reset(): void
 }
 
+function clampEditorFraction(fraction: number): number {
+  return Math.min(0.85, Math.max(0.15, fraction))
+}
+
 export function sameTable(a: TableRef, b: TableRef): boolean {
   return a.name === b.name && (a.schema ?? null) === (b.schema ?? null)
 }
 
-export const useTabs = create<TabsState>()((set) => ({
-  tabs: [],
-  activeId: null,
-  queryCount: 0,
+// The focused pane's active tab.
+export function focusedTab(s: TabsState): Tab | undefined {
+  const activeId = findPane(s.root, s.focusedPaneId)?.activeId
+  return activeId ? s.tabs.find((t) => t.id === activeId) : undefined
+}
 
-  openQuery: () =>
+type Layout = Pick<TabsState, 'root' | 'focusedPaneId'>
+
+function initial(): Pick<TabsState, 'tabs' | 'queryCount'> & Layout {
+  const pane = newPane()
+  return { tabs: [], root: pane, focusedPaneId: pane.id, queryCount: 0 }
+}
+
+// The pane to open a tab in: the given one, or else the focused one.
+function targetPane(s: TabsState, paneId?: string): Pane {
+  return findPane(s.root, paneId ?? s.focusedPaneId) ?? panesOf(s.root)[0]
+}
+
+// Adds the tab at the end of the pane's tabs and activates it, focusing the pane.
+function addTab(s: TabsState, paneId: string, tabId: string): Layout {
+  return {
+    root: updatePane(s.root, paneId, (p) => ({
+      ...p,
+      tabIds: [...p.tabIds, tabId],
+      activeId: tabId
+    })),
+    focusedPaneId: paneId
+  }
+}
+
+// Takes the tab out of its pane; if it was active, the tab to its right (or else left) becomes
+// active. A pane left empty is removed, unless it is the only one, and the focus moves to the
+// pane before it (or else after).
+function removeTab(s: TabsState, tabId: string): Layout {
+  const pane = paneOfTab(s.root, tabId)
+  if (!pane) return s
+  const index = pane.tabIds.indexOf(tabId)
+  const tabIds = pane.tabIds.filter((id) => id !== tabId)
+  const activeId =
+    pane.activeId === tabId ? (tabIds[index] ?? tabIds[index - 1] ?? null) : pane.activeId
+  const root = updatePane(s.root, pane.id, (p) => ({ ...p, tabIds, activeId }))
+  if (tabIds.length > 0 || root.type === 'pane') return { root, focusedPaneId: s.focusedPaneId }
+  const order = panesOf(root)
+  const at = order.findIndex((p) => p.id === pane.id)
+  const focusedPaneId =
+    s.focusedPaneId === pane.id ? (order[at - 1] ?? order[at + 1]).id : s.focusedPaneId
+  return { root: removePane(root, pane.id), focusedPaneId }
+}
+
+function newQueryTab(s: TabsState, sql = '', editorFraction = s.editorFraction): QueryTabState {
+  return {
+    id: crypto.randomUUID(),
+    type: 'query',
+    title: `Query ${s.queryCount + 1}`,
+    sql,
+    editorFraction
+  }
+}
+
+function updateQueryTab(
+  s: TabsState,
+  id: string,
+  update: (tab: QueryTabState) => QueryTabState
+): Pick<TabsState, 'tabs'> {
+  return { tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? update(t) : t)) }
+}
+
+export const useTabs = create<TabsState>()((set) => ({
+  ...initial(),
+  editorFraction: 0.4,
+
+  openQuery: (paneId) =>
     set((s) => {
-      const count = s.queryCount + 1
-      const tab: Tab = { id: crypto.randomUUID(), type: 'query', title: `Query ${count}`, sql: '' }
-      return { tabs: [...s.tabs, tab], activeId: tab.id, queryCount: count }
+      const tab = newQueryTab(s)
+      return {
+        tabs: [...s.tabs, tab],
+        queryCount: s.queryCount + 1,
+        ...addTab(s, targetPane(s, paneId).id, tab.id)
+      }
     }),
 
   openTable: (table) =>
     set((s) => {
-      const open = s.tabs.find((t) => t.type === 'table' && sameTable(t.table, table))
-      if (open) return { activeId: open.id }
+      const open = s.tabs.filter((t) => t.type === 'table' && sameTable(t.table, table))
+      const focused = findPane(s.root, s.focusedPaneId)
+      const existing = open.find((t) => focused?.tabIds.includes(t.id)) ?? open[0]
+      const pane = existing && paneOfTab(s.root, existing.id)
+      if (existing && pane) {
+        return {
+          root: updatePane(s.root, pane.id, (p) => ({ ...p, activeId: existing.id })),
+          focusedPaneId: pane.id
+        }
+      }
       const tab: Tab = {
         id: crypto.randomUUID(),
         type: 'table',
         title: table.name,
         table: { schema: table.schema, name: table.name }
       }
-      return { tabs: [...s.tabs, tab], activeId: tab.id }
+      return { tabs: [...s.tabs, tab], ...addTab(s, targetPane(s).id, tab.id) }
     }),
 
-  activate: (id) => set({ activeId: id }),
-
-  // Closing the active tab activates the one to its right, or else its left.
-  close: (id) =>
+  activate: (tabId) =>
     set((s) => {
-      const index = s.tabs.findIndex((t) => t.id === id)
-      if (index === -1) return {}
-      const tabs = s.tabs.filter((t) => t.id !== id)
-      const activeId =
-        s.activeId === id ? ((tabs[index] ?? tabs[index - 1])?.id ?? null) : s.activeId
-      return { tabs, activeId }
+      const pane = paneOfTab(s.root, tabId)
+      if (!pane) return s
+      return {
+        root: updatePane(s.root, pane.id, (p) => ({ ...p, activeId: tabId })),
+        focusedPaneId: pane.id
+      }
     }),
 
-  setSql: (id, sql) =>
-    set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? { ...t, sql } : t))
-    })),
+  // Returning the same state skips notifying, since a click anywhere in a pane focuses it.
+  focusPane: (paneId) =>
+    set((s) =>
+      s.focusedPaneId === paneId || !findPane(s.root, paneId) ? s : { focusedPaneId: paneId }
+    ),
 
-  setRun: (id, run) =>
-    set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? { ...t, run } : t))
-    })),
+  close: (tabId) =>
+    set((s) => ({ tabs: s.tabs.filter((t) => t.id !== tabId), ...removeTab(s, tabId) })),
+
+  split: (tabId, side) =>
+    set((s) => {
+      const tab = s.tabs.find((t) => t.id === tabId)
+      const pane = paneOfTab(s.root, tabId)
+      if (!tab || !pane) return s
+      const copy: Tab =
+        tab.type === 'query'
+          ? newQueryTab(s, tab.sql, tab.editorFraction)
+          : { ...tab, id: crypto.randomUUID() }
+      const target = newPane([copy.id])
+      return {
+        tabs: [...s.tabs, copy],
+        queryCount: tab.type === 'query' ? s.queryCount + 1 : s.queryCount,
+        root: insertPane(s.root, pane.id, side, target),
+        focusedPaneId: target.id
+      }
+    }),
+
+  moveToNewPane: (tabId, side) =>
+    set((s) => {
+      const pane = paneOfTab(s.root, tabId)
+      if (!pane || pane.tabIds.length < 2) return s
+      const target = newPane([tabId])
+      const { root } = removeTab(s, tabId)
+      return { root: insertPane(root, pane.id, side, target), focusedPaneId: target.id }
+    }),
+
+  resize: (splitId, sizes) => set((s) => ({ root: resizeSplit(s.root, splitId, sizes) })),
+
+  setSql: (id, sql) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, sql }))),
+
+  setEditorFraction: (id, fraction) =>
+    set((s) => {
+      const editorFraction = clampEditorFraction(fraction)
+      return { editorFraction, ...updateQueryTab(s, id, (t) => ({ ...t, editorFraction })) }
+    }),
+
+  setRun: (id, run) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, run }))),
 
   setRunView: (id, view) =>
-    set((s) => ({
-      tabs: s.tabs.map((t) =>
-        t.id === id && t.type === 'query' && t.run ? { ...t, run: { ...t.run, view } } : t
-      )
-    })),
+    set((s) => updateQueryTab(s, id, (t) => (t.run ? { ...t, run: { ...t.run, view } } : t))),
 
-  setSession: (id, sessionId) =>
-    set((s) => ({
-      tabs: s.tabs.map((t) => (t.id === id && t.type === 'query' ? { ...t, sessionId } : t))
-    })),
+  setSession: (id, sessionId) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, sessionId }))),
 
-  reset: () => set({ tabs: [], activeId: null, queryCount: 0 })
+  reset: () => set(initial())
 }))

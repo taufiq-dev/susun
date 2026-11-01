@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { TableInfo } from '@shared/types'
 import { RefreshIcon } from '@renderer/components/icons'
 import { Button, IconButton, TextInput } from '@renderer/components/ui'
-import { sameTable, useTabs } from '@renderer/store/tabs'
+import { focusedTab, sameTable, useTabs } from '@renderer/store/tabs'
 
 type Loaded = { tables: TableInfo[] } | { error: string }
 
@@ -11,8 +11,9 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   const [reloads, setReloads] = useState(0)
   const [filter, setFilter] = useState('')
   const openTable = useTabs((s) => s.openTable)
+  // The focused pane's table, if it shows one.
   const activeTable = useTabs((s) => {
-    const tab = s.tabs.find((t) => t.id === s.activeId)
+    const tab = focusedTab(s)
     return tab?.type === 'table' ? tab.table : null
   })
 
