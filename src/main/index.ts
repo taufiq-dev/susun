@@ -1,56 +1,8 @@
-import { app, nativeTheme, shell, BrowserWindow } from 'electron'
-import { join } from 'path'
-import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import icon from '../../resources/icon.png?asset'
+import { app, nativeTheme, BrowserWindow } from 'electron'
+import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { registerIpc } from './ipc'
-
-// The window's own background, which shows wherever the page hasn't painted: in the strip a quick
-// resize uncovers before the page lays out again at the new size. Electron's default is white, so
-// it matches the page's surface colour in the OS theme instead (--surface in main.css).
-function windowBackground(): string {
-  return nativeTheme.shouldUseDarkColors ? '#222328' : '#ffffff'
-}
-
-function createWindow(): void {
-  // Create the browser window.
-  const mainWindow = new BrowserWindow({
-    width: 1280,
-    height: 800,
-    minWidth: 960,
-    minHeight: 600,
-    show: false,
-    backgroundColor: windowBackground(),
-    autoHideMenuBar: true,
-    // On macOS, no title bar of its own: the page's top band takes its place, in the app's colours,
-    // with the traffic lights centred in it (the band is 40px; see `frameless` in main.css). Elsewhere
-    // the system's title bar stays.
-    ...(process.platform === 'darwin'
-      ? { titleBarStyle: 'hidden' as const, trafficLightPosition: { x: 14, y: 13 } }
-      : {}),
-    ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
-    }
-  })
-
-  mainWindow.on('ready-to-show', () => {
-    mainWindow.show()
-  })
-
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
-
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-}
+import { setAppMenu } from './menu'
+import { createMainWindow, hasMainWindow, windowBackground } from './windows'
 
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
@@ -67,6 +19,7 @@ app.whenReady().then(() => {
   })
 
   registerIpc()
+  setAppMenu()
 
   // The page follows the OS theme by itself; the windows' backgrounds follow it here.
   nativeTheme.on('updated', () => {
@@ -74,12 +27,12 @@ app.whenReady().then(() => {
       window.setBackgroundColor(windowBackground())
   })
 
-  createWindow()
+  createMainWindow()
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
-    // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    // dock icon is clicked and there are no other windows open (the Settings window aside).
+    if (!hasMainWindow()) createMainWindow()
   })
 })
 

@@ -10,10 +10,11 @@ import {
 import { moveFocus } from '@renderer/components/roving'
 import { IconButton } from '@renderer/components/ui'
 import { useRevealSelected } from '@renderer/components/useRevealSelected'
-import { endSession } from '@renderer/features/query/run'
+import { isDirty } from '@renderer/features/query/files'
 import type { Pane } from '@renderer/store/panes'
 import { useSession } from '@renderer/store/session'
 import { useTabs, type Tab } from '@renderer/store/tabs'
+import { closeTab } from './closing'
 import { MOD, focusPaneContent } from './shortcuts'
 
 // Once a tab closed from the keyboard is gone: focuses the tab now active in its pane, or the
@@ -33,8 +34,10 @@ function focusFocusedPane(): void {
   focusPaneContent(useTabs.getState().focusedPaneId)
 }
 
+// A tab's tooltip: a query file's path, or a table's schema-qualified name.
 function tabTitle(tab: Tab): string {
-  return tab.type === 'table' && tab.table.schema ? `${tab.table.schema}.${tab.title}` : tab.title
+  if (tab.type === 'query') return tab.file?.path ?? tab.title
+  return tab.table.schema ? `${tab.table.schema}.${tab.title}` : tab.title
 }
 
 // A pane's tabs. `focused` marks the pane that New query and the sidebar act on, shown on its
@@ -51,7 +54,6 @@ export function TabBar({
   const allTabs = useTabs((s) => s.tabs)
   const tabs = pane.tabIds.flatMap((id) => allTabs.find((t) => t.id === id) ?? [])
   const activate = useTabs((s) => s.activate)
-  const closeTab = useTabs((s) => s.close)
   const openQuery = useTabs((s) => s.openQuery)
   const split = useTabs((s) => s.split)
   const moveToNewPane = useTabs((s) => s.moveToNewPane)
@@ -65,9 +67,10 @@ export function TabBar({
   const list = useRef<HTMLDivElement>(null)
   useRevealSelected(list, pane.activeId)
 
-  const close = (id: string): void => {
-    if (connectionId) endSession(connectionId, id)
-    closeTab(id)
+  // Closes the tab once any unsaved SQL is dealt with (see closing.ts); `then` runs if it closed.
+  const close = (id: string, then?: () => void): void => {
+    if (!connectionId) return
+    void closeTab(connectionId, id).then((closed) => closed && then?.())
   }
 
   const menuItems = (tab: Tab): MenuEntry[] => {
@@ -114,10 +117,7 @@ export function TabBar({
       'separator',
       {
         label: 'Close',
-        onSelect: () => {
-          close(tab.id)
-          focusFocusedPane()
-        }
+        onSelect: () => close(tab.id, focusFocusedPane)
       }
     ]
   }
@@ -136,6 +136,8 @@ export function TabBar({
       >
         {tabs.map((tab) => {
           const selected = tab.id === pane.activeId
+          // Unsaved SQL shows as a dot where the close button is, until the tab is hovered.
+          const dirty = tab.type === 'query' && isDirty(tab)
           return (
             <div
               key={tab.id}
@@ -157,8 +159,7 @@ export function TabBar({
                 onKeyDown={(e) => {
                   if (e.key !== 'Delete' && e.key !== 'Backspace') return
                   e.preventDefault()
-                  close(tab.id)
-                  focusActiveTab(pane.id)
+                  close(tab.id, () => focusActiveTab(pane.id))
                 }}
                 // Double-click maximizes the pane, or restores the layout, as in VS Code.
                 onDoubleClick={() => several && toggleMaximize(pane.id)}
@@ -175,13 +176,22 @@ export function TabBar({
                 {tab.title}
               </button>
               <IconButton
-                label={`Close ${tab.title}`}
+                label={dirty ? `Close ${tab.title} (unsaved changes)` : `Close ${tab.title}`}
                 onClick={() => close(tab.id)}
                 tabIndex={-1}
                 size="sm"
-                className={`mr-1 ${selected ? '' : 'opacity-0 group-hover:opacity-100'}`}
+                className={`mr-1 ${selected || dirty ? '' : 'opacity-0 group-hover:opacity-100'}`}
               >
-                <CloseIcon />
+                {dirty ? (
+                  <>
+                    <span className="size-2 rounded-full bg-current group-hover:hidden" />
+                    <span className="hidden group-hover:contents">
+                      <CloseIcon />
+                    </span>
+                  </>
+                ) : (
+                  <CloseIcon />
+                )}
               </IconButton>
             </div>
           )

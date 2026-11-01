@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import type { SqlFile } from '@shared/api'
 import type { Statement } from '@shared/split'
 import type { QueryResult, TableRef } from '@shared/types'
 import {
@@ -54,6 +55,9 @@ export interface QueryTabState {
   sessionId?: string
   // The editor's share of the tab's height; the results get the rest.
   editorFraction: number
+  // The .sql file the tab was opened from or last saved to, and the SQL as read or written then,
+  // which tells whether the tab has unsaved changes. A tab on a file is titled with its name.
+  file?: { path: string; savedSql: string }
 }
 
 export interface TableTabState {
@@ -82,6 +86,10 @@ interface TabsState {
   editorFraction: number
   // In the given pane, or else the focused one.
   openQuery(paneId?: string): void
+  // Opens a query tab on the file in the focused pane, or activates the tab already open on it.
+  openFile(file: SqlFile): void
+  // The tab has been saved to the file, with this SQL.
+  setFile(id: string, file: NonNullable<QueryTabState['file']>): void
   // Activates the table's tab if it is open: the focused pane's, or else another pane's.
   openTable(table: TableRef): void
   // Activates the tab in its pane, and focuses the pane.
@@ -109,6 +117,11 @@ interface TabsState {
 
 function clampEditorFraction(fraction: number): number {
   return Math.min(0.85, Math.max(0.15, fraction))
+}
+
+// The last part of a file's path, e.g. "orders.sql".
+export function fileName(path: string): string {
+  return path.split(/[\\/]/).pop() || path
 }
 
 export function sameTable(a: TableRef, b: TableRef): boolean {
@@ -196,6 +209,27 @@ export const useTabs = create<TabsState>()((set) => ({
       }
     }),
 
+  openFile: (file) =>
+    set((s) => {
+      const existing = s.tabs.find((t) => t.type === 'query' && t.file?.path === file.path)
+      const pane = existing && paneOfTab(s.root, existing.id)
+      if (existing && pane) {
+        return {
+          root: updatePane(s.root, pane.id, (p) => ({ ...p, activeId: existing.id })),
+          focusedPaneId: pane.id
+        }
+      }
+      const tab: QueryTabState = {
+        ...newQueryTab(s, file.sql),
+        title: fileName(file.path),
+        file: { path: file.path, savedSql: file.sql }
+      }
+      return { tabs: [...s.tabs, tab], ...addTab(s, targetPane(s).id, tab.id) }
+    }),
+
+  setFile: (id, file) =>
+    set((s) => updateQueryTab(s, id, (t) => ({ ...t, file, title: fileName(file.path) }))),
+
   openTable: (table) =>
     set((s) => {
       const open = s.tabs.filter((t) => t.type === 'table' && sameTable(t.table, table))
@@ -241,14 +275,18 @@ export const useTabs = create<TabsState>()((set) => ({
       const tab = s.tabs.find((t) => t.id === tabId)
       const pane = paneOfTab(s.root, tabId)
       if (!tab || !pane) return s
+      // A copy of a query tab on a file is on the same file (saving either writes it).
       const copy: Tab =
         tab.type === 'query'
-          ? newQueryTab(s, tab.sql, tab.editorFraction)
+          ? {
+              ...newQueryTab(s, tab.sql, tab.editorFraction),
+              ...(tab.file && { title: tab.title, file: tab.file })
+            }
           : { ...tab, id: crypto.randomUUID() }
       const target = newPane([copy.id])
       return {
         tabs: [...s.tabs, copy],
-        queryCount: tab.type === 'query' ? s.queryCount + 1 : s.queryCount,
+        queryCount: tab.type === 'query' && !tab.file ? s.queryCount + 1 : s.queryCount,
         root: insertPane(s.root, pane.id, side, target),
         focusedPaneId: target.id
       }

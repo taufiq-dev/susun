@@ -4,16 +4,21 @@ import type {
   QueryResult,
   SavedConnection,
   SavedConnectionInput,
+  Settings,
   TableInfo,
   TableRef
 } from './types'
 
 // What preload exposes as `window.api`. Each method is an `ipcMain.handle` channel named
-// `<group>:<method>`, so `api.db.query` is `db:query`.
+// `<group>:<method>`, so `api.db.query` is `db:query`. The exceptions are the `on...` methods of
+// `AppApi`, which listen for messages the main process sends (see `AppEvents`).
 export interface Api {
   db: DbApi
   connections: ConnectionsApi
   dialog: DialogApi
+  files: FilesApi
+  settings: SettingsApi
+  app: AppApi
 }
 
 // A connection has its own session, which calls given the connection id run on, and can open more.
@@ -54,6 +59,64 @@ export interface ConnectionsApi {
 export interface DialogApi {
   // Asks the user to pick a SQLite database file. Resolves to its path, or null if cancelled.
   openSqliteFile(): Promise<string | null>
+}
+
+// A .sql file and its text.
+export interface SqlFile {
+  path: string
+  sql: string
+}
+
+// Query tabs' .sql files. A window can only write to files the user picked in its Open or Save
+// dialogs, so a page can't write wherever it likes.
+export interface FilesApi {
+  // Asks the user for a .sql file to open. Resolves to it, or null if cancelled.
+  openSql(): Promise<SqlFile | null>
+  // Writes the SQL to `path` (a file this window opened or saved), or with no path first asks where
+  // to save it, suggesting `name`. Resolves to the path written, or null if the user cancelled or
+  // writing failed (the user is told why in a dialog).
+  saveSql(sql: string, path: string | null, name: string): Promise<string | null>
+}
+
+export interface SettingsApi {
+  get(): Promise<Settings>
+  // Changes some settings and tells every window (`AppApi.onSettingsChanged`).
+  set(changes: Partial<Settings>): Promise<Settings>
+}
+
+// Why query tabs with unsaved SQL are about to close.
+export type CloseReason = 'close-tab' | 'disconnect' | 'close-window'
+
+// The answer to the save prompt. When the user has turned the prompt off, it is 'discard'.
+export type SaveChoice = 'save' | 'discard' | 'cancel'
+
+// What the app menu (or the main process) asks the focused window's page to do.
+export type AppCommand =
+  | 'new-query'
+  | 'open'
+  | 'save'
+  | 'save-as'
+  | 'close-tab'
+  // The window is closing (its close button, Close Window, or quitting): the page settles its
+  // unsaved query tabs, then calls `closeWindow`, or doesn't if the user cancels.
+  | 'close-window'
+
+// Messages the main process sends a window's page, by channel.
+export interface AppEvents {
+  'app:command': AppCommand
+  'app:settingsChanged': Settings
+}
+
+export interface AppApi {
+  // Asks whether to save the query tabs with these titles before they close, in a native dialog
+  // with Save, Don't Save and Cancel, and a "Don't ask again" checkbox that turns the setting off.
+  // Resolves to 'discard' without asking if the setting is off.
+  confirmSave(titles: string[], reason: CloseReason): Promise<SaveChoice>
+  // Closes this window without asking again, and carries on quitting if quitting is what closed it.
+  closeWindow(): Promise<void>
+  // Listen for messages from the main process; each returns a function that stops listening.
+  onCommand(listener: (command: AppCommand) => void): () => void
+  onSettingsChanged(listener: (settings: Settings) => void): () => void
 }
 
 // How a handler's outcome crosses IPC. An error thrown in a handler would reach the renderer

@@ -9,6 +9,12 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Decided
 
+- **Unsaved SQL: a save prompt, query files and a Settings window** (the user's choices). Closing a query tab
+  with unsaved SQL, disconnecting, closing the window or quitting asks first, in the native dialog (a sheet on
+  macOS) with Save, Don't Save, Cancel and "Don't ask again"; Disconnect uses it too, in place of its
+  two-click confirmation. Save writes a `.sql` file, through the Save dialog, and the tab stays on that file
+  (rather than a saved-queries list inside Trowel). "Don't ask again" turns off a setting in a separate
+  Settings window (Trowel > Settings…, Cmd+,), which needs a custom app menu.
 - **Split panes, as in VS Code.** The tab area splits right or down, nested, into resizable panes, each with
   its own tabs; tabs move between panes by dragging, or onto a pane's edge to split it. One of the reasons
   for building Trowel: Beekeeper Studio shows one tab at a time.
@@ -269,8 +275,35 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     resize (it was the strip's top edge). Tested in the built app: no fill or borders, Run 8 px from the
     pane's edge, the line following a 100 px drag; the 9a, fixes and keyboard tests still pass.
   - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
-  - [ ] **10e. New Window** — opens another connect screen in a new window (a custom app menu, which also
-    allows Cmd+W for tabs).
+  - [x] **Save prompts, query files and Settings** (asked for after the Run row; see "Decided") —
+    - An app menu (`menu.ts`): Settings… (Cmd+,); File: New Query (Cmd+T), Open… (Cmd+O), Save (Cmd+S), Save
+      As… (Cmd+Shift+S), Close Tab (Cmd+W; with no tab, or in Settings, it closes the window), Close Window
+      (Cmd+Shift+W); Edit; View (Reload and DevTools only in development, since reloading loses the tabs);
+      Window. The File commands go to the focused window's page (`AppCommand`, `commands.ts`).
+    - Query tabs on files: Open and Save As through the native dialogs; the tab is titled with the file's
+      name (its path in the tooltip), Cmd+S writes it without asking, opening a file already open goes to its
+      tab, and splitting a tab on a file gives a copy on the same file. A tab with unsaved SQL (changed since
+      read or saved, or not on a file and not empty) shows a dot in place of its close button until hovered.
+      A window writes only files its user picked in its own dialogs.
+    - The save prompt (`api.app.confirmSave`): one tab names it ("Do you want to save the changes to
+      “Query 1”?"); several are listed, with Save All, which shows each tab as its Save dialog opens and stops
+      at the first one cancelled. The message says why: before disconnecting, closing the window or quitting.
+    - Closing a main window is held back until its page has settled its unsaved tabs (`windows.ts`); a
+      cancelled close also cancels a quit, which starts again once the window may close.
+    - Settings: a `settings` table in trowel.db (migration 2; `store.ts` now holds the migrations) and a
+      Settings window with one setting, "Ask to save a query tab's SQL before closing it", which "Don't ask
+      again" turns off and every window hears about at once.
+    Tested in the built app, with the main process's dialogs replaced by stubs from its inspector: each
+    prompt's text and buttons and each answer (Cancel, Save, Save with the Save dialog cancelled, Don't Save,
+    Save All stopping at a cancelled dialog, "Don't ask again"), Open, Cmd+S, Save As, the Settings window
+    showing and changing the setting, Cmd+W there, Disconnect, closing the window and quitting (cancelled,
+    then not; then a window closed after a cancelled quit closing only itself, which first quit the app: a
+    bug the test found), and quitting with nothing unsaved. The 9a, 9c, 10a-10c, fixes and keyboard tests
+    still pass with the prompt turned off. Not done: a running query on a tab whose SQL is saved closes with
+    no prompt (Disconnect's old confirmation asked about it), and a query tab's SQL still isn't kept when
+    the app quits without saving.
+  - [ ] **10e. New Window** — opens another connect screen in a new window, from the File menu (the app menu
+    now exists).
 - [ ] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a

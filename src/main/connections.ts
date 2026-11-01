@@ -1,44 +1,17 @@
-// Saved connections, kept in trowel.db in the app's userData folder. Passwords are encrypted with
-// safeStorage (the macOS Keychain, Windows DPAPI or the Linux secret store) and decrypted again
-// for the renderer, so they are protected only at rest. The async safeStorage calls don't block
-// the main process if the OS shows a keychain prompt.
+// Saved connections, kept in trowel.db (store.ts). Passwords are encrypted with safeStorage (the
+// macOS Keychain, Windows DPAPI or the Linux secret store) and decrypted again for the renderer, so
+// they are protected only at rest. The async safeStorage calls don't block the main process if the
+// OS shows a keychain prompt.
 import { randomUUID } from 'crypto'
-import { join } from 'path'
-import Database from 'better-sqlite3'
-import { app, safeStorage } from 'electron'
+import { safeStorage } from 'electron'
 import type { ConnectionConfig, SavedConnection, SavedConnectionInput } from '@shared/types'
-
-// One entry per schema version, applied in order and tracked in `pragma user_version`.
-const MIGRATIONS = [
-  `create table connections (
-    id text primary key,
-    name text not null,
-    config text not null, -- ConnectionConfig as JSON, without the password
-    password blob -- encrypted with safeStorage; null when there is none
-  )`
-]
+import { store } from './store'
 
 interface Row {
   id: string
   name: string
   config: string
   password: Buffer | null
-}
-
-let db: Database.Database | undefined
-
-function store(): Database.Database {
-  if (db) return db
-  const opened = new Database(join(app.getPath('userData'), 'trowel.db'))
-  const version = opened.pragma('user_version', { simple: true }) as number
-  for (let v = version; v < MIGRATIONS.length; v++) {
-    opened.transaction(() => {
-      opened.exec(MIGRATIONS[v])
-      opened.pragma(`user_version = ${v + 1}`)
-    })()
-  }
-  db = opened
-  return db
 }
 
 export async function listConnections(): Promise<SavedConnection[]> {

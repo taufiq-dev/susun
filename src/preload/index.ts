@@ -1,11 +1,24 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
-import type { Api, IpcResult } from '@shared/api'
+import type { Api, AppEvents, IpcResult } from '@shared/api'
 
 async function invoke<T>(channel: string, ...args: unknown[]): Promise<T> {
   const result: IpcResult<T> = await ipcRenderer.invoke(channel, ...args)
   if (!result.ok) throw new Error(result.message)
   return result.value
+}
+
+// Calls `listener` with each message the main process sends on the channel, until the returned
+// function is called. The listener isn't given the IPC event, which would expose ipcRenderer.
+function listen<C extends keyof AppEvents>(
+  channel: C,
+  listener: (value: AppEvents[C]) => void
+): () => void {
+  const handler = (_event: IpcRendererEvent, value: AppEvents[C]): void => listener(value)
+  ipcRenderer.on(channel, handler)
+  return () => {
+    ipcRenderer.removeListener(channel, handler)
+  }
 }
 
 // Custom APIs for renderer
@@ -27,6 +40,20 @@ const api: Api = {
   },
   dialog: {
     openSqliteFile: () => invoke('dialog:openSqliteFile')
+  },
+  files: {
+    openSql: () => invoke('files:openSql'),
+    saveSql: (sql, path, name) => invoke('files:saveSql', sql, path, name)
+  },
+  settings: {
+    get: () => invoke('settings:get'),
+    set: (changes) => invoke('settings:set', changes)
+  },
+  app: {
+    confirmSave: (titles, reason) => invoke('app:confirmSave', titles, reason),
+    closeWindow: () => invoke('app:closeWindow'),
+    onCommand: (listener) => listen('app:command', listener),
+    onSettingsChanged: (listener) => listen('app:settingsChanged', listener)
   }
 }
 
