@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PanelRightIcon } from '@renderer/components/icons'
+import { MainArea } from '@renderer/components/SidePanel'
 import { Button, DbMark, IconButton } from '@renderer/components/ui'
 import { RowPanel } from '@renderer/features/json-viewer/RowPanel'
 import { TableList } from '@renderer/features/sidebar/TableList'
@@ -35,9 +36,9 @@ export function Workspace({ session }: { session: Session }): React.JSX.Element 
 
       <div className="flex min-h-0 flex-1">
         <TableList connectionId={session.connectionId} />
-        <main className="flex min-w-0 flex-1">
+        <MainArea className="flex">
           <Panes connectionId={session.connectionId} dbType={session.type} />
-        </main>
+        </MainArea>
         {showRow && <RowPanel />}
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ConnectionConfig, SavedConnection } from '@shared/types'
+import { MainArea, SidePanel } from '@renderer/components/SidePanel'
 import { Button, DbMark } from '@renderer/components/ui'
 import { useSession } from '@renderer/store/session'
 import { ConnectionFields } from './ConnectionFields'
@@ -111,7 +112,7 @@ export function ConnectScreen(): React.JSX.Element {
 
   return (
     <div className="flex h-full">
-      <aside className="flex w-64 shrink-0 flex-col border-r border-line bg-sunken">
+      <SidePanel id="connections" side="left" resizeLabel="Resize the saved connections list">
         <h1 className="px-4 pt-4 pb-3 text-[15px] font-semibold">Trowel</h1>
         <h2 className="px-4 pb-1.5 text-[12px] text-muted">Saved connections</h2>
         <div className="min-h-0 flex-1 overflow-y-auto">
@@ -158,9 +159,9 @@ export function ConnectScreen(): React.JSX.Element {
             New connection
           </Button>
         </div>
-      </aside>
+      </SidePanel>
 
-      <main className="min-w-0 flex-1 overflow-y-auto bg-surface">
+      <MainArea className="overflow-y-auto bg-surface">
         <form
           data-db={draft.type}
           className="flex max-w-[560px] flex-col gap-6 px-10 py-8"
@@ -207,7 +208,7 @@ export function ConnectScreen(): React.JSX.Element {
             </p>
           </div>
         </form>
-      </main>
+      </MainArea>
     </div>
   )
 }

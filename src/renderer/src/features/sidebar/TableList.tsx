@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { TableInfo } from '@shared/types'
 import { RefreshIcon } from '@renderer/components/icons'
+import { SidePanel } from '@renderer/components/SidePanel'
 import { Button, IconButton, TextInput } from '@renderer/components/ui'
 import { focusedTab, sameTable, useTabs } from '@renderer/store/tabs'
 
@@ -34,9 +35,12 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   }
 
   return (
-    <aside
-      aria-label="Tables"
-      className="flex w-60 shrink-0 flex-col border-r border-line bg-sunken select-none"
+    <SidePanel
+      id="tables"
+      side="left"
+      label="Tables"
+      resizeLabel="Resize the tables list"
+      className="select-none"
     >
       <div className="flex items-center gap-1 p-2">
         <TextInput
@@ -67,7 +71,7 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
           />
         )}
       </div>
-    </aside>
+    </SidePanel>
   )
 }
 

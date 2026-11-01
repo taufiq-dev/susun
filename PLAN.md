@@ -117,8 +117,8 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   and 11; the row panel is a placeholder (step 12) that the header button hides. Replaced the template's demo UI
   and `ping` handler; the window is now 1280x800 (min 960x600). Tested by driving the built app over the
   DevTools protocol, with screenshots in light and dark; the native file picker is untested.
-  Not done: resizable panes, keyboard shortcuts for tabs (Cmd+W would need a custom app menu, since the default
-  menu closes the window), and noticing a dropped connection.
+  Not done: resizable side panels (since done, under step 10), keyboard shortcuts for tabs (Cmd+W would need a
+  custom app menu, since the default menu closes the window), and noticing a dropped connection.
 - [x] **9. Query tab** — in four parts, each committed on its own.
   - [x] **9a. Editor and results** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor.
     Results in AG Grid with row count and run time; show database errors in place of the grid. Register AG
@@ -218,6 +218,16 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     split and after maximizing undid an earlier edit); the button, double-click and menu item toggle it;
     Cmd+3, splitting and closing the maximized pane's last tab restored the layout; with one pane the
     button is hidden and the menu item disabled. The 10a, 10b and step 9 tests still pass.
+  - [x] **Resizable side panels** (asked for after 10c) — the saved connections list, the tables list and the
+    row panel: drag the line at their inner edge, or focus it and use the arrow keys (16 px a press);
+    double-clicking it restores the default width. `components/SidePanel.tsx`; the widths are in
+    `store/layout.ts`, kept in localStorage between launches. Minimums: connections 180 px, tables 160 px,
+    row 200 px. The main area beside them keeps at least 400 px, so a drag stops there, and in a narrower
+    window the panels shrink first, down to their minimums. Also: the window's background now matches the
+    theme, so a quick resize of the window no longer shows white strips in dark mode. Tested in the built
+    app: drags, the minimums and the 400 px limit, keys, double-click, the widths surviving a reload and the
+    row panel being hidden and shown, the panels giving way at 960 px wide, and the tables list's edge
+    taking the pointer over the editor's gutter, which has its own z-index.
   - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
   - [ ] **10e. New Window** — opens another connect screen in a new window (a custom app menu, which also
     allows Cmd+W for tabs).
