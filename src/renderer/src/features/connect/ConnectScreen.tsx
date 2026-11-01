@@ -203,7 +203,7 @@ export function ConnectScreen(): React.JSX.Element {
           </ul>
         </div>
         <div className="border-t border-line p-3">
-          <Button className="w-full" onClick={() => edit(emptyDraft())}>
+          <Button className="flex w-full" onClick={() => edit(emptyDraft())}>
             New connection
           </Button>
         </div>

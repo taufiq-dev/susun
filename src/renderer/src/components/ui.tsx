@@ -52,7 +52,11 @@ export function Button({
           type={type}
           className={cn(
             BUTTON_BASE,
-            'h-7 gap-1.5 rounded-[5px] px-3 font-medium whitespace-nowrap',
+            // The label raised 1px (by 2px of bottom padding: Chromium places text on whole pixels,
+            // so 1px would round away). Centred exactly, most labels look low, since lowercase
+            // letters, most of what's seen, sit in the lower part of the line. A whole-pixel line
+            // height keeps the label's place the same in every button.
+            'h-7 gap-1.5 rounded-[5px] px-3 pb-0.5 leading-[18px] font-medium whitespace-nowrap',
             BUTTON_VARIANTS[variant],
             className
           )}
