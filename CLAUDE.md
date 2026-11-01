@@ -97,8 +97,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 
 A clone of Beekeeper Studio lives at `~/projects/beekeeper-studio` for reference.
 
-- Never copy code from its `apps/studio/src-commercial/` (commercial license).
-- Its other code is GPLv3; porting it makes Trowel a derivative that must be GPLv3 when distributed. Ask the user before porting any of its code.
+- Don't copy or port any of its code (the user's decision). Its `apps/studio/src-commercial/` is under a commercial license and the rest is GPLv3. Use the clone only to see how it approaches a problem, then write Trowel's own code.
 - Don't use the Beekeeper Studio name or logo.
 
 ## Code style

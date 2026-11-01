@@ -5,10 +5,12 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Open decisions (ask the user before acting)
 
-- **License for Trowel** (GPLv3 vs MIT/closed): decides whether any Beekeeper Studio GPLv3 code may be ported.
+- **License for Trowel** (MIT, GPLv3 or closed): needed before distributing it (step 12).
 
 ## Decided
 
+- **No Beekeeper Studio code.** None of it is copied or ported, GPLv3 or commercial. The clone is only for
+  seeing how it approaches a problem.
 - **Scripts: one result per statement, split by Trowel.** The editor's SQL is split into statements and they
   run one at a time on the connection, stopping at the first error, as psql, the mysql client and sqlite3 do:
   each commits on its own unless the script has its own BEGIN/COMMIT, and statements before an error keep
