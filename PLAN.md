@@ -199,7 +199,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     MariaDB and SQLite INSERT ... RETURNING) still changes all 25,000; types, params, transactions across calls,
     VACUUM and CREATE INDEX CONCURRENTLY work through the cursor; Cancel works during a Postgres cursor read and
     while MariaDB streams 100 million rows.
-- [ ] **10. Panes and sessions** — in five parts, each committed on its own (see "Decided").
+- [x] **10. Panes and sessions** — in five parts, each committed on its own (see "Decided").
   - [x] **10a. A session per query tab** — `api.db.openSession`/`closeSession`; `query` and `cancel` take a
     session id (or a connection id, for the connection's own session). A query tab opens its session on its
     first run and closes it with the tab, which stops a query still running there; disconnecting or closing
@@ -387,8 +387,18 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     edited. Tested in the built app on Postgres and SQLite, on scratch tables: each item, Cancel and confirm,
     Postgres refusing to truncate a referenced table, closing untouched tabs without a prompt. Not yet:
     Rename, Duplicate, Hide, SQL: Create, Export and Import.
-  - [ ] **10e. New Window** — opens another connect screen in a new window, from the File menu (the app menu
-    now exists).
+  - [x] **10e. New Window** — opens another connect screen in a new window, from the File menu (the app menu
+    now exists). File > New Window (Cmd+N) opens a main window on the connect screen, cascading 24 px from
+    the window it was opened from. Each window has its own connection and sessions (they belong to the
+    window's page), tabs and layout; settings reach every window. Quitting with several windows now asks one
+    window at a time, as macOS apps do: Electron asks every window to close at once, so the first one asked
+    holds the quit and the others wait without asking; once it may close, quitting starts again for the
+    next; if its user cancels, the page says so (`api.app.cancelClose`) and the quit stops (before, every
+    window asked at once, and after Cancel in one the others still asked, as "closing the window"). Tested
+    in the built app: the menu item, the cascade, a Postgres window and a SQLite window each running on
+    its own connection, disconnecting one leaving the other connected, closing one leaving the other
+    working, quitting with unsaved SQL in both (Cancel: one prompt, both stay and work; Don't Save twice:
+    each asked in turn, then the app quits).
 - [x] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
   parameters and per-database identifier quoting (`"name"` Postgres/SQLite, `` `name` `` MySQL). Edits: collect
   changed cells, apply one `UPDATE … WHERE <primary key> = ?` per row in a transaction; tables without a

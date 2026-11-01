@@ -3,7 +3,7 @@
 import { is } from '@electron-toolkit/utils'
 import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
 import type { AppCommand } from '@shared/api'
-import { openSettingsWindow, sendCommand } from './windows'
+import { createMainWindow, openSettingsWindow, sendCommand } from './windows'
 
 const IS_MAC = process.platform === 'darwin'
 
@@ -50,6 +50,12 @@ export function setAppMenu(): void {
     {
       label: 'File',
       submenu: [
+        {
+          // Another connect screen, for another connection (each window has its own).
+          label: 'New Window',
+          accelerator: 'CmdOrCtrl+N',
+          click: () => createMainWindow(BrowserWindow.getFocusedWindow())
+        },
         command('New Query', 'new-query', 'CmdOrCtrl+T'),
         command('Open…', 'open', 'CmdOrCtrl+O'),
         separator,

@@ -57,21 +57,31 @@ export function sendCommand(contents: WebContents, command: AppCommand): void {
 // is held back and the page is sent 'close-window'. Once the user has dealt with them, the page
 // calls `allowClose`, which closes the window for real. If the user cancels, the window stays.
 //
-// Quitting closes every window, and a close held back cancels the quit, so a window held back while
-// quitting is remembered, and quitting starts again once it is allowed to close.
+// Quitting asks every window to close at once, and a close held back cancels the quit. So quitting
+// asks one window at a time, as macOS apps do: the first window to close is asked, and the others
+// hold their close without asking. Once that window is let close, quitting starts again (and the
+// next window is asked); if its user cancels, the page says so (`cancelClose`) and the quit stops.
 const mainWindows = new Set<BrowserWindow>()
 const mayClose = new WeakSet<WebContents>()
 const quitAfterClose = new WeakSet<WebContents>()
+// A quit is under way: from before-quit until the window it asked is let close, or cancels.
 let quitting = false
+// The window the quit is waiting on.
+let askedToQuit: WebContents | null = null
 
 app.on('before-quit', () => {
   quitting = true
+  askedToQuit = null
 })
 
-export function createMainWindow(): BrowserWindow {
+// Opens a main window on the connect screen: centred, or, for New Window, offset from the window
+// it was opened from, as windows cascade on macOS.
+export function createMainWindow(from?: BrowserWindow | null): BrowserWindow {
+  const offset = from && !from.isDestroyed() ? from.getBounds() : null
   const window = new BrowserWindow({
-    width: 1280,
-    height: 800,
+    width: offset?.width ?? 1280,
+    height: offset?.height ?? 800,
+    ...(offset && { x: offset.x + 24, y: offset.y + 24 }),
     minWidth: 960,
     minHeight: 600,
     ...common()
@@ -85,10 +95,12 @@ export function createMainWindow(): BrowserWindow {
     // A page that crashed or is still loading can't answer.
     if (mayClose.has(contents) || contents.isCrashed() || contents.isLoading()) return
     e.preventDefault()
-    // Set afresh each time: after a quit the user cancelled, a plain close mustn't quit.
-    if (quitting) quitAfterClose.add(contents)
-    else quitAfterClose.delete(contents)
-    quitting = false
+    if (quitting) {
+      // Another window is being asked: this one waits its turn.
+      if (askedToQuit && askedToQuit !== contents) return
+      askedToQuit = contents
+      quitAfterClose.add(contents)
+    } else quitAfterClose.delete(contents)
     sendCommand(contents, 'close-window')
   })
   contents.setWindowOpenHandler((details) => {
@@ -115,8 +127,18 @@ export function allowClose(contents: WebContents): void {
   if (!window) return
   mayClose.add(contents)
   const quit = quitAfterClose.has(contents)
+  if (askedToQuit === contents) askedToQuit = null
   window.close()
   if (quit) app.quit()
+}
+
+// The page's user cancelled closing its window: a quit waiting on it stops.
+export function cancelClose(contents: WebContents): void {
+  quitAfterClose.delete(contents)
+  if (askedToQuit === contents) {
+    askedToQuit = null
+    quitting = false
+  }
 }
 
 let settingsWindow: BrowserWindow | null = null

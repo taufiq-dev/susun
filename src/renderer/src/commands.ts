@@ -14,6 +14,7 @@ async function run(command: AppCommand): Promise<void> {
   switch (command) {
     case 'close-window':
       if (await settleUnsaved('close-window')) await window.api.app.closeWindow()
+      else await window.api.app.cancelClose()
       return
     case 'close-tab':
       // With no tab to close, the window closes, as in a browser.

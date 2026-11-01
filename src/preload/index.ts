@@ -65,6 +65,7 @@ const api: Api = {
   app: {
     confirmSave: (titles, reason) => invoke('app:confirmSave', titles, reason),
     closeWindow: () => invoke('app:closeWindow'),
+    cancelClose: () => invoke('app:cancelClose'),
     onCommand: (listener) => listen('app:command', listener),
     onSettingsChanged: (listener) => listen('app:settingsChanged', listener)
   }

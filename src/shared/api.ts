@@ -135,7 +135,7 @@ export type AppCommand =
   | 'save-as'
   | 'close-tab'
   // The window is closing (its close button, Close Window, or quitting): the page settles its
-  // unsaved query tabs, then calls `closeWindow`, or doesn't if the user cancels.
+  // unsaved tabs, then calls `closeWindow`, or `cancelClose` if the user cancels.
   | 'close-window'
 
 // Messages the main process sends a window's page, by channel.
@@ -151,6 +151,8 @@ export interface AppApi {
   confirmSave(titles: string[], reason: CloseReason): Promise<SaveChoice>
   // Closes this window without asking again, and carries on quitting if quitting is what closed it.
   closeWindow(): Promise<void>
+  // The user cancelled closing this window: stops a quit that was waiting on it.
+  cancelClose(): Promise<void>
   // Listen for messages from the main process; each returns a function that stops listening.
   onCommand(listener: (command: AppCommand) => void): () => void
   onSettingsChanged(listener: (settings: Settings) => void): () => void

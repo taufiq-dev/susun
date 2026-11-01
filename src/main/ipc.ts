@@ -38,7 +38,7 @@ import {
   rememberFile
 } from './library'
 import { getSettings, setSettings } from './settings'
-import { allowClose, closingToQuit } from './windows'
+import { allowClose, cancelClose, closingToQuit } from './windows'
 
 // The main-process side of an API group in @shared/api: the same methods, each also given the
 // invoking event.
@@ -391,7 +391,8 @@ const appHandlers: Handlers<AppHandlersApi> = {
     if (checkboxChecked && choice !== 'cancel') setSettings({ askToSaveQueries: false })
     return choice
   },
-  closeWindow: async (event) => allowClose(event.sender)
+  closeWindow: async (event) => allowClose(event.sender),
+  cancelClose: async (event) => cancelClose(event.sender)
 }
 
 function handle<T>(group: string, handlers: Handlers<T>): void {
