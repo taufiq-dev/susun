@@ -16,9 +16,10 @@ const SEPARATOR_HEIGHT = 9
 const PADDING = 8
 const MARGIN = 4
 
-// A menu at the pointer, as a right-click opens. It closes on a choice, Escape (which returns the
-// focus), a click elsewhere, or the window losing focus or resizing. Kept inside the window, using
-// its known size rather than measuring it.
+// A menu at the pointer, as a right-click opens. It closes on a choice, Escape, a click elsewhere,
+// or the window losing focus or resizing. A choice or Escape returns the focus to where it was
+// before the menu opened (a choice first, so an action that moves the focus itself still can).
+// Kept inside the window, using its known size rather than measuring it.
 export function ContextMenu({
   x,
   y,
@@ -34,9 +35,11 @@ export function ContextMenu({
   onClose: () => void
 }): React.JSX.Element {
   const menu = useRef<HTMLDivElement>(null)
+  // What had the focus before the menu took it.
+  const previous = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    previous.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
     const onPointerDown = (e: PointerEvent): void => {
       if (!menu.current?.contains(e.target as Node)) onClose()
     }
@@ -44,7 +47,7 @@ export function ContextMenu({
       if (e.key !== 'Escape') return
       e.preventDefault()
       e.stopPropagation()
-      previous?.focus()
+      previous.current?.focus()
       onClose()
     }
     window.addEventListener('pointerdown', onPointerDown, true)
@@ -98,6 +101,7 @@ export function ContextMenu({
             role="menuitem"
             disabled={item.disabled}
             onClick={() => {
+              previous.current?.focus()
               onClose()
               item.onSelect()
             }}

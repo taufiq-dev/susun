@@ -246,8 +246,15 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     port (10 s timeout) and a bad password (unchanged); button, option and tab widths before and during
     each state; 14 tabs and 30 result tabs scrolled to the selected one; no "Loading tables…" on reload;
     Disconnect with real mouse clicks. The 10a-10c, 9a and 9c tests still pass.
-  - [ ] **Keyboard navigation** (design review fix 6) — arrow keys within a tab bar and the tables list
-    (one Tab stop each), Enter in the tables filter opens the only match, and focus after a tab menu choice.
+  - [x] **Keyboard navigation** (design review fix 6) — a tab bar, a script's result tabs and the tables list
+    are each one Tab stop (`components/roving.ts`): the arrow keys, Home and End move within them. In a tab
+    bar the arrows move the focus and Enter opens the tab (opening one focuses its editor, which would end
+    the arrowing); Delete or Backspace closes the focused tab, since the close buttons aren't Tab stops; the
+    result tabs show the result as the arrows reach it. In the tables list Down and Up move, Up from the
+    first table returns to the filter, and in the filter Down enters the list and Enter opens the only
+    match (or, with several, goes to the first). A tab menu choice returns the focus to the tab before it
+    runs, and Split, Move and Close then focus the pane they leave active, as Cmd+\ does. Tested in the
+    built app with real key presses; the 10b, 10c and fixes 1-5 tests still pass.
   - [ ] **Title bar in the theme** (asked for after the design fixes) — macOS can't recolour its title bar, so
     hide it (`titleBarStyle: 'hidden'`) and put the traffic lights in Trowel's own top band.
   - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.

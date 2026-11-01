@@ -1,6 +1,7 @@
 import { Fragment, useRef } from 'react'
 import { ROW_LIMIT, type QueryResult } from '@shared/types'
 import { ResultGrid } from '@renderer/components/ResultGrid'
+import { moveFocus } from '@renderer/components/roving'
 import { useRevealSelected } from '@renderer/components/useRevealSelected'
 import type { QueryRun, StatementRun } from '@renderer/store/tabs'
 
@@ -211,6 +212,10 @@ function ScriptResults({
       <div className="flex h-8 shrink-0 items-stretch border-b border-line px-1 select-none">
         <div
           ref={tabs}
+          // One Tab stop; the arrow keys choose the result to show.
+          onKeyDown={(e) =>
+            moveFocus(e, e.currentTarget, '[role=tab]', 'horizontal', true)?.click()
+          }
           role="tablist"
           aria-label="Results"
           className="flex min-w-0 overflow-x-auto"
@@ -269,6 +274,7 @@ function ViewTab({
       type="button"
       role="tab"
       aria-selected={selected}
+      tabIndex={selected ? 0 : -1}
       title={title}
       onClick={onClick}
       className={`focus-ring shrink-0 px-2.5 text-[12px] whitespace-nowrap ${

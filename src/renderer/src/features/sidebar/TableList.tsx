@@ -1,11 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { TableInfo } from '@shared/types'
 import { RefreshIcon } from '@renderer/components/icons'
+import { moveFocus } from '@renderer/components/roving'
 import { SidePanel } from '@renderer/components/SidePanel'
 import { Button, IconButton, TextInput } from '@renderer/components/ui'
 import { focusedTab, sameTable, useTabs } from '@renderer/store/tabs'
 
 type Loaded = { tables: TableInfo[] } | { error: string }
+
+// The list's items. The list is one Tab stop (the open table, or else the first), and the arrow
+// keys move through it.
+const ITEM = 'button[data-table]'
 
 export function TableList({ connectionId }: { connectionId: string }): React.JSX.Element {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
@@ -13,6 +18,8 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   // A reload keeps the list it has (and its scroll position) until the new one arrives.
   const [reloading, setReloading] = useState(false)
   const [filter, setFilter] = useState('')
+  const filterInput = useRef<HTMLInputElement>(null)
+  const list = useRef<HTMLDivElement>(null)
   const openTable = useTabs((s) => s.openTable)
   // The focused pane's table, if it shows one.
   const activeTable = useTabs((s) => {
@@ -59,12 +66,36 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
           placeholder="Filter tables"
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
+          ref={filterInput}
+          // Down goes into the list. Enter opens the table if only one matches, or else goes into
+          // the list, where Enter opens the focused one.
+          onKeyDown={(e) => {
+            if (e.key !== 'ArrowDown' && e.key !== 'Enter') return
+            const items = list.current?.querySelectorAll<HTMLElement>(ITEM) ?? []
+            if (items.length === 0) return
+            e.preventDefault()
+            if (e.key === 'Enter' && items.length === 1) items[0].click()
+            else list.current?.querySelector<HTMLElement>(`${ITEM}[tabindex="0"]`)?.focus()
+          }}
         />
         <IconButton label="Reload tables" onClick={reload} disabled={reloading}>
           <RefreshIcon />
         </IconButton>
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto pb-2">
+      <div
+        ref={list}
+        // Up from the first table goes back to the filter.
+        onKeyDown={(e) => {
+          if (!(e.target instanceof HTMLElement) || !e.target.matches(ITEM)) return
+          if (e.key === 'ArrowUp' && e.target === e.currentTarget.querySelector(ITEM)) {
+            e.preventDefault()
+            filterInput.current?.focus()
+            return
+          }
+          moveFocus(e, e.currentTarget, ITEM, 'vertical')
+        }}
+        className="min-h-0 flex-1 overflow-y-auto pb-2"
+      >
         {loaded === null && <p className="px-3 text-[12px] text-muted">Loading tables…</p>}
         {loaded && 'error' in loaded && (
           <div className="flex flex-col items-start gap-2 px-3">
@@ -107,21 +138,28 @@ function Groups({
   if (shown.length === 0) {
     return <p className="px-3 text-[12px] text-muted">No tables match “{filter}”.</p>
   }
+  const matching = (all: TableInfo[]): TableInfo[] =>
+    all.filter((t) => t.name.toLowerCase().includes(filter))
+  // The list's Tab stop: the open table if it's shown, or else the first shown, in list order.
+  const inOrder = [...groups.values()].flatMap(matching)
+  const current = inOrder.find(isActive) ?? inOrder[0]
   return (
     <>
       {[...groups].map(([schema, all]) => {
-        const matching = all.filter((t) => t.name.toLowerCase().includes(filter))
-        if (matching.length === 0) return null
+        const listed = matching(all)
+        if (listed.length === 0) return null
         return (
           <section key={schema}>
             {groups.size > 1 && (
               <h3 className="truncate px-3 pt-2 pb-0.5 text-[12px] text-muted">{schema}</h3>
             )}
             <ul>
-              {matching.map((t) => (
+              {listed.map((t) => (
                 <li key={t.name}>
                   <button
                     type="button"
+                    data-table
+                    tabIndex={t === current ? 0 : -1}
                     title={t.schema ? `${t.schema}.${t.name}` : t.name}
                     onClick={() => onOpen(t)}
                     className={`focus-ring flex h-6 w-full items-center gap-2 px-3 text-left ${
