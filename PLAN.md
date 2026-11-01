@@ -263,6 +263,11 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     title bar (content starts at the window's top), the bands' sizes and drag regions, the header's buttons
     and the side panel's edge left clickable. Not checked by eye in the test, since the traffic lights
     aren't in page screenshots. Not done: in macOS full screen the lights hide but the 80 px stays empty.
+  - [x] **Run row** (asked for after the title bar) — the bar between editor and results was a full-width
+    strip with a fill and borders; the run status and the Run (or Cancel) button now sit along the editor's
+    foot in its own colour, status on the left and Run on the right, above a single line that drags to
+    resize (it was the strip's top edge). Tested in the built app: no fill or borders, Run 8 px from the
+    pane's edge, the line following a 100 px drag; the 9a, fixes and keyboard tests still pass.
   - [ ] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
   - [ ] **10e. New Window** — opens another connect screen in a new window (a custom app menu, which also
     allows Cmd+W for tabs).

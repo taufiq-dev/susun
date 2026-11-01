@@ -75,28 +75,57 @@ export function QueryTab({
     if (rect) setEditorFraction((clientY - rect.top) / rect.height)
   }
 
+  // The editor, with the run status and the Run button along its foot in its own colour, then a
+  // line that drags to share the height with the results below.
   return (
     <div ref={container} className="flex h-full flex-col">
       <div
-        className="min-h-0 shrink-0 overflow-hidden"
+        className="flex min-h-0 shrink-0 flex-col"
         style={{ height: `${editorFraction * 100}%` }}
       >
-        <CodeMirror
-          ref={editor}
-          value={tab.sql}
-          onChange={(sql) => setSql(tab.id, sql)}
-          extensions={extensions}
-          basicSetup={BASIC_SETUP}
-          theme="none"
-          height="100%"
-          className="h-full"
-          placeholder="select * from …"
-          aria-label={`SQL for ${tab.title}`}
-          autoFocus
-        />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <CodeMirror
+            ref={editor}
+            value={tab.sql}
+            onChange={(sql) => setSql(tab.id, sql)}
+            extensions={extensions}
+            basicSetup={BASIC_SETUP}
+            theme="none"
+            height="100%"
+            className="h-full"
+            placeholder="select * from …"
+            aria-label={`SQL for ${tab.title}`}
+            autoFocus
+          />
+        </div>
+        <div className="flex h-9 shrink-0 items-center gap-3 pr-2 pl-3">
+          <span role="status" className="min-w-0 flex-1 truncate text-[12px]">
+            <RunStatus run={tab.run} />
+          </span>
+          {tab.run?.state === 'running' ? (
+            <Button
+              onClick={() => cancelRun(tab.id)}
+              disabled={tab.run.cancelling}
+              title="Stop the running statement; the statements after it don’t run"
+              className="min-w-20"
+            >
+              Cancel
+            </Button>
+          ) : (
+            <Button
+              variant="primary"
+              onClick={run}
+              title={`Run the selection, or the whole editor (${RUN_SHORTCUT})`}
+              className="min-w-20"
+            >
+              Run
+              <span className="text-[11px] opacity-75">{RUN_SHORTCUT}</span>
+            </Button>
+          )}
+        </div>
       </div>
 
-      <div className="relative flex h-9 shrink-0 items-center gap-3 border-y border-line bg-sunken px-2">
+      <div className="relative h-px shrink-0 bg-line">
         {/* Drag (or focus and use the arrow keys) to share the height between editor and results. */}
         <div
           role="separator"
@@ -117,31 +146,8 @@ export function QueryTab({
             if (e.key === 'ArrowUp') setEditorFraction(editorFraction - 0.05)
             else if (e.key === 'ArrowDown') setEditorFraction(editorFraction + 0.05)
           }}
-          className="focus-ring absolute inset-x-0 -top-1 z-10 h-2 cursor-row-resize"
+          className="focus-ring absolute inset-x-0 -top-[3px] z-10 h-[7px] cursor-row-resize"
         />
-        {tab.run?.state === 'running' ? (
-          <Button
-            onClick={() => cancelRun(tab.id)}
-            disabled={tab.run.cancelling}
-            title="Stop the running statement; the statements after it don’t run"
-            className="min-w-20"
-          >
-            Cancel
-          </Button>
-        ) : (
-          <Button
-            variant="primary"
-            onClick={run}
-            title={`Run the selection, or the whole editor (${RUN_SHORTCUT})`}
-            className="min-w-20"
-          >
-            Run
-            <span className="text-[11px] opacity-75">{RUN_SHORTCUT}</span>
-          </Button>
-        )}
-        <span role="status" className="truncate text-[12px]">
-          <RunStatus run={tab.run} />
-        </span>
       </div>
 
       <div className="min-h-0 flex-1">
