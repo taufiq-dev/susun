@@ -17,7 +17,7 @@ export function Workspace({ session }: { session: Session }): React.JSX.Element 
     // The connection's database type sets the accent colour for the whole workspace.
     <div data-db={session.type} className="flex h-full flex-col">
       {/* The window's top band; on macOS it is the title bar, holding the traffic lights (frameless). */}
-      <header className="flex h-10 shrink-0 items-center gap-2.5 border-t-2 border-b border-t-accent border-b-line bg-sunken pr-2 pl-3 select-none frameless:app-drag frameless:pl-20">
+      <header className="flex h-10 shrink-0 items-center gap-2.5 border-b border-line bg-sunken pr-2 pl-3 select-none frameless:app-drag frameless:pl-20">
         <DbMark type={session.type} />
         <span className="truncate font-semibold">{session.name}</span>
         {session.detail !== session.name && (
