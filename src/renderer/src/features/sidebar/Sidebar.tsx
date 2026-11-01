@@ -1,5 +1,6 @@
 import { HistoryIcon, SavedQueriesIcon, TablesIcon } from '@renderer/components/icons'
 import { moveFocus } from '@renderer/components/roving'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/shadcn/tooltip'
 import { SidePanel } from '@renderer/components/SidePanel'
 import { useLayout, type SidebarView } from '@renderer/store/layout'
 import type { Session } from '@renderer/store/session'
@@ -34,24 +35,29 @@ export function Sidebar({ session }: { session: Session }): React.JSX.Element {
           {VIEWS.map((v) => {
             const selected = v.id === view
             return (
-              <button
-                key={v.id}
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                aria-label={v.label}
-                title={v.label}
-                tabIndex={selected ? 0 : -1}
-                onClick={() => setView(v.id)}
-                className={`focus-ring relative flex h-10 w-full items-center justify-center ${
-                  selected ? 'text-ink' : 'text-muted hover:text-ink'
-                }`}
-              >
-                {selected && (
-                  <span className="absolute inset-y-2 left-0 w-0.5 rounded-r bg-accent" />
-                )}
-                {v.icon}
-              </button>
+              <Tooltip key={v.id}>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      role="tab"
+                      aria-selected={selected}
+                      aria-label={v.label}
+                      tabIndex={selected ? 0 : -1}
+                      onClick={() => setView(v.id)}
+                      className={`focus-ring relative flex h-10 w-full items-center justify-center ${
+                        selected ? 'text-ink' : 'text-muted hover:text-ink'
+                      }`}
+                    >
+                      {selected && (
+                        <span className="absolute inset-y-2 left-0 w-0.5 rounded-r bg-accent" />
+                      )}
+                      {v.icon}
+                    </button>
+                  }
+                />
+                <TooltipContent side="right">{v.label}</TooltipContent>
+              </Tooltip>
             )
           })}
         </div>

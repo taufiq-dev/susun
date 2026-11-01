@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { AllCommunityModule, ModuleRegistry } from 'ag-grid-community'
 import App from './App'
 import { listenForCommands } from './commands'
+import { TooltipProvider } from './components/shadcn/tooltip'
 import { SettingsWindow } from './features/settings/SettingsWindow'
 import { FRAMELESS } from './platform'
 
@@ -16,5 +17,7 @@ const settingsWindow = location.hash === '#settings'
 if (!settingsWindow) listenForCommands()
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>{settingsWindow ? <SettingsWindow /> : <App />}</StrictMode>
+  <StrictMode>
+    <TooltipProvider>{settingsWindow ? <SettingsWindow /> : <App />}</TooltipProvider>
+  </StrictMode>
 )

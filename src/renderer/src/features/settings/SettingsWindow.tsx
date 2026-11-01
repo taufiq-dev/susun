@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { Settings } from '@shared/types'
+import { Switch } from '@renderer/components/shadcn/switch'
 import { FRAMELESS } from '@renderer/platform'
 
 // The Settings window's page (the window's URL ends in #settings). A change applies at once; there
@@ -41,14 +42,7 @@ export function SettingsWindow(): React.JSX.Element {
       )}
       <main className="flex flex-col gap-3 px-6 pt-3 pb-6">
         <h2 className="text-[12px] text-muted">Query tabs</h2>
-        <label className="flex items-start gap-2.5">
-          <input
-            type="checkbox"
-            checked={settings?.askToSaveQueries ?? false}
-            disabled={!settings}
-            onChange={(e) => change({ askToSaveQueries: e.target.checked })}
-            className="mt-0.5 accent-accent"
-          />
+        <label className="flex items-start justify-between gap-6">
           <span>
             Ask to save a query tab’s SQL before closing it
             <span className="mt-0.5 block text-[12px] text-muted">
@@ -56,6 +50,12 @@ export function SettingsWindow(): React.JSX.Element {
               isn’t saved to a file is discarded without asking.
             </span>
           </span>
+          <Switch
+            checked={settings?.askToSaveQueries ?? false}
+            disabled={!settings}
+            onCheckedChange={(checked) => change({ askToSaveQueries: checked })}
+            className="mt-0.5"
+          />
         </label>
         {error && <p className="text-[12px] text-danger select-text">{error}</p>}
       </main>

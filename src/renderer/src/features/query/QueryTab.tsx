@@ -106,7 +106,7 @@ export function QueryTab({
             <Button
               onClick={() => cancelRun(tab.id)}
               disabled={tab.run.cancelling}
-              title="Stop the running statement; the statements after it don’t run"
+              tooltip="Stop the running statement; the statements after it don’t run"
               className="min-w-20"
             >
               Cancel
@@ -115,7 +115,7 @@ export function QueryTab({
             <Button
               variant="primary"
               onClick={run}
-              title={`Run the selection, or the whole editor (${RUN_SHORTCUT})`}
+              tooltip={`Run the selection, or the whole editor (${RUN_SHORTCUT})`}
               className="min-w-20"
             >
               Run

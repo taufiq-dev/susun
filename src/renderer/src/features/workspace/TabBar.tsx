@@ -1,5 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
-import { ContextMenu, type MenuEntry } from '@renderer/components/ContextMenu'
+import { useRef } from 'react'
 import {
   CloseIcon,
   MaximizeIcon,
@@ -8,6 +7,14 @@ import {
   SplitRightIcon
 } from '@renderer/components/icons'
 import { moveFocus } from '@renderer/components/roving'
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuShortcut,
+  ContextMenuTrigger
+} from '@renderer/components/shadcn/context-menu'
 import { IconButton } from '@renderer/components/ui'
 import { useRevealSelected } from '@renderer/components/useRevealSelected'
 import { isDirty } from '@renderer/features/query/files'
@@ -62,8 +69,6 @@ export function TabBar({
   const several = useTabs((s) => s.root.type === 'split')
   const maximized = useTabs((s) => s.maximizedPaneId === pane.id)
   const connectionId = useSession((s) => s.session?.connectionId)
-  const [menu, setMenu] = useState<{ x: number; y: number; tab: Tab } | null>(null)
-  const closeMenu = useCallback(() => setMenu(null), [])
   const list = useRef<HTMLDivElement>(null)
   useRevealSelected(list, pane.activeId)
 
@@ -73,53 +78,55 @@ export function TabBar({
     void closeTab(connectionId, id).then((closed) => closed && then?.())
   }
 
-  const menuItems = (tab: Tab): MenuEntry[] => {
+  // A tab's right-click menu (shadcn's ContextMenu).
+  const menu = (tab: Tab): React.JSX.Element => {
     const alone = pane.tabIds.length < 2
-    return [
-      {
-        label: 'Split right',
-        shortcut: `${MOD}\\`,
-        onSelect: () => {
-          split(tab.id, 'right')
-          focusFocusedPane()
-        }
-      },
-      {
-        label: 'Split down',
-        onSelect: () => {
-          split(tab.id, 'down')
-          focusFocusedPane()
-        }
-      },
-      'separator',
-      {
-        label: 'Move to a new pane on the right',
-        disabled: alone,
-        onSelect: () => {
-          moveToNewPane(tab.id, 'right')
-          focusFocusedPane()
-        }
-      },
-      {
-        label: 'Move to a new pane below',
-        disabled: alone,
-        onSelect: () => {
-          moveToNewPane(tab.id, 'down')
-          focusFocusedPane()
-        }
-      },
-      'separator',
-      {
-        label: maximized ? 'Restore panes' : 'Maximize pane',
-        disabled: !several,
-        onSelect: () => toggleMaximize(pane.id)
-      },
-      'separator',
-      {
-        label: 'Close',
-        onSelect: () => close(tab.id, focusFocusedPane)
-      }
-    ]
+    return (
+      <ContextMenuContent aria-label={`${tab.title} tab`}>
+        <ContextMenuItem
+          onClick={() => {
+            split(tab.id, 'right')
+            focusFocusedPane()
+          }}
+        >
+          Split right
+          <ContextMenuShortcut>{`${MOD}\\`}</ContextMenuShortcut>
+        </ContextMenuItem>
+        <ContextMenuItem
+          onClick={() => {
+            split(tab.id, 'down')
+            focusFocusedPane()
+          }}
+        >
+          Split down
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem
+          disabled={alone}
+          onClick={() => {
+            moveToNewPane(tab.id, 'right')
+            focusFocusedPane()
+          }}
+        >
+          Move to a new pane on the right
+        </ContextMenuItem>
+        <ContextMenuItem
+          disabled={alone}
+          onClick={() => {
+            moveToNewPane(tab.id, 'down')
+            focusFocusedPane()
+          }}
+        >
+          Move to a new pane below
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem disabled={!several} onClick={() => toggleMaximize(pane.id)}>
+          {maximized ? 'Restore panes' : 'Maximize pane'}
+        </ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onClick={() => close(tab.id, focusFocusedPane)}>Close</ContextMenuItem>
+      </ContextMenuContent>
+    )
   }
 
   const active = tabs.find((t) => t.id === pane.activeId)
@@ -139,61 +146,59 @@ export function TabBar({
           // Unsaved SQL shows as a dot where the close button is, until the tab is hovered.
           const dirty = tab.type === 'query' && isDirty(tab)
           return (
-            <div
-              key={tab.id}
-              role="presentation"
-              className={`group flex max-w-52 shrink-0 items-center border-r border-line ${
-                selected
-                  ? `bg-surface text-ink ${focused ? 'shadow-[inset_0_2px_0_var(--accent)]' : 'shadow-[inset_0_2px_0_var(--line)]'}`
-                  : 'text-muted hover:text-ink'
-              }`}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={selected}
-                tabIndex={selected ? 0 : -1}
-                title={tabTitle(tab)}
-                onClick={() => activate(tab.id)}
-                // Delete (or Backspace) closes the focused tab, as its close button isn't a Tab stop.
-                onKeyDown={(e) => {
-                  if (e.key !== 'Delete' && e.key !== 'Backspace') return
-                  e.preventDefault()
-                  close(tab.id, () => focusActiveTab(pane.id))
-                }}
-                // Double-click maximizes the pane, or restores the layout, as in VS Code.
-                onDoubleClick={() => several && toggleMaximize(pane.id)}
-                // Middle-click closes, as in a browser.
-                onAuxClick={(e) => {
-                  if (e.button === 1) close(tab.id)
-                }}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  setMenu({ x: e.clientX, y: e.clientY, tab })
-                }}
-                className="focus-ring h-full min-w-0 truncate pr-1 pl-3 text-left"
+            <ContextMenu key={tab.id}>
+              <ContextMenuTrigger
+                role="presentation"
+                className={`group flex max-w-52 shrink-0 items-center border-r border-line ${
+                  selected
+                    ? `bg-surface text-ink ${focused ? 'shadow-[inset_0_2px_0_var(--accent)]' : 'shadow-[inset_0_2px_0_var(--line)]'}`
+                    : 'text-muted hover:text-ink'
+                }`}
               >
-                {tab.title}
-              </button>
-              <IconButton
-                label={dirty ? `Close ${tab.title} (unsaved changes)` : `Close ${tab.title}`}
-                onClick={() => close(tab.id)}
-                tabIndex={-1}
-                size="sm"
-                className={`mr-1 ${selected || dirty ? '' : 'opacity-0 group-hover:opacity-100'}`}
-              >
-                {dirty ? (
-                  <>
-                    <span className="size-2 rounded-full bg-current group-hover:hidden" />
-                    <span className="hidden group-hover:contents">
-                      <CloseIcon />
-                    </span>
-                  </>
-                ) : (
-                  <CloseIcon />
-                )}
-              </IconButton>
-            </div>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  tabIndex={selected ? 0 : -1}
+                  title={tabTitle(tab)}
+                  onClick={() => activate(tab.id)}
+                  // Delete (or Backspace) closes the focused tab, as its close button isn't a Tab stop.
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Delete' && e.key !== 'Backspace') return
+                    e.preventDefault()
+                    close(tab.id, () => focusActiveTab(pane.id))
+                  }}
+                  // Double-click maximizes the pane, or restores the layout, as in VS Code.
+                  onDoubleClick={() => several && toggleMaximize(pane.id)}
+                  // Middle-click closes, as in a browser.
+                  onAuxClick={(e) => {
+                    if (e.button === 1) close(tab.id)
+                  }}
+                  className="focus-ring h-full min-w-0 truncate pr-1 pl-3 text-left"
+                >
+                  {tab.title}
+                </button>
+                <IconButton
+                  label={dirty ? `Close ${tab.title} (unsaved changes)` : `Close ${tab.title}`}
+                  onClick={() => close(tab.id)}
+                  tabIndex={-1}
+                  size="sm"
+                  className={`mr-1 ${selected || dirty ? '' : 'opacity-0 group-hover:opacity-100'}`}
+                >
+                  {dirty ? (
+                    <>
+                      <span className="size-2 rounded-full bg-current group-hover:hidden" />
+                      <span className="hidden group-hover:contents">
+                        <CloseIcon />
+                      </span>
+                    </>
+                  ) : (
+                    <CloseIcon />
+                  )}
+                </IconButton>
+              </ContextMenuTrigger>
+              {menu(tab)}
+            </ContextMenu>
           )
         })}
       </div>
@@ -203,7 +208,7 @@ export function TabBar({
       {several && (
         <IconButton
           label={maximized ? 'Restore panes' : 'Maximize pane'}
-          title={
+          tooltip={
             maximized
               ? 'Restore panes (or double-click a tab)'
               : 'Maximize this pane (or double-click a tab)'
@@ -217,7 +222,7 @@ export function TabBar({
       )}
       <IconButton
         label="Split right"
-        title={`Split right (${MOD}\\). Alt-click to split down.`}
+        tooltip={`Split right (${MOD}\\). Alt-click to split down.`}
         disabled={!active}
         onClick={(e) => {
           if (!active) return
@@ -228,15 +233,6 @@ export function TabBar({
       >
         <SplitRightIcon />
       </IconButton>
-      {menu && (
-        <ContextMenu
-          x={menu.x}
-          y={menu.y}
-          label={`${menu.tab.title} tab`}
-          items={menuItems(menu.tab)}
-          onClose={closeMenu}
-        />
-      )}
     </div>
   )
 }

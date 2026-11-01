@@ -1,9 +1,10 @@
 import type { ComponentProps, ReactNode } from 'react'
 import type { DbType } from '@shared/types'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@renderer/components/shadcn/tooltip'
+import { cn } from '@renderer/lib/utils'
 
-// A `className` passed to these components should only add layout (margin, width, visibility).
-// Two utilities that set the same property don't override by class order: whichever comes later
-// in Tailwind's generated CSS wins, so a caller's `px-0` can lose to the component's `px-3`.
+// A `className` passed to these components is merged with `cn`, so a caller's utility overrides
+// the component's own for the same property (a caller's `px-0` beats the component's `px-3`).
 const BUTTON_BASE =
   'focus-ring inline-flex shrink-0 items-center justify-center disabled:pointer-events-none disabled:opacity-50'
 
@@ -13,19 +14,51 @@ const BUTTON_VARIANTS = {
   danger: 'border border-line bg-surface text-danger hover:bg-sunken'
 }
 
-type ButtonProps = ComponentProps<'button'> & { variant?: keyof typeof BUTTON_VARIANTS }
+// Shows the button's tooltip (shadcn's Tooltip) when given one.
+function WithTooltip({
+  tooltip,
+  button
+}: {
+  tooltip?: ReactNode
+  button: React.JSX.Element
+}): React.JSX.Element {
+  if (!tooltip) return button
+  return (
+    <Tooltip>
+      <TooltipTrigger render={button} />
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+type ButtonProps = ComponentProps<'button'> & {
+  variant?: keyof typeof BUTTON_VARIANTS
+  // Shown on hover and focus, e.g. what the button does and its shortcut.
+  tooltip?: ReactNode
+}
 
 export function Button({
   variant = 'secondary',
   type = 'button',
-  className = '',
+  tooltip,
+  className,
   ...props
 }: ButtonProps): React.JSX.Element {
   return (
-    <button
-      type={type}
-      className={`${BUTTON_BASE} h-7 gap-1.5 rounded-[5px] px-3 font-medium whitespace-nowrap ${BUTTON_VARIANTS[variant]} ${className}`}
-      {...props}
+    <WithTooltip
+      tooltip={tooltip}
+      button={
+        <button
+          type={type}
+          className={cn(
+            BUTTON_BASE,
+            'h-7 gap-1.5 rounded-[5px] px-3 font-medium whitespace-nowrap',
+            BUTTON_VARIANTS[variant],
+            className
+          )}
+          {...props}
+        />
+      }
     />
   )
 }
@@ -35,25 +68,36 @@ const ICON_BUTTON_SIZES = {
   sm: 'size-5 rounded-[4px]'
 }
 
-// A borderless square button holding an icon. `label` is its accessible name and tooltip. The
-// hover tint is translucent so it shows on any background.
+// A borderless square button holding an icon. `label` is its accessible name and its tooltip,
+// unless `tooltip` says more. The hover tint is translucent so it shows on any background.
 export function IconButton({
   label,
+  tooltip,
   size = 'md',
   type = 'button',
-  className = '',
+  className,
   ...props
 }: ComponentProps<'button'> & {
   label: string
+  tooltip?: ReactNode
   size?: keyof typeof ICON_BUTTON_SIZES
 }): React.JSX.Element {
   return (
-    <button
-      type={type}
-      aria-label={label}
-      title={label}
-      className={`${BUTTON_BASE} ${ICON_BUTTON_SIZES[size]} text-muted hover:bg-ink/10 hover:text-ink aria-pressed:text-ink ${className}`}
-      {...props}
+    <WithTooltip
+      tooltip={tooltip ?? label}
+      button={
+        <button
+          type={type}
+          aria-label={label}
+          className={cn(
+            BUTTON_BASE,
+            ICON_BUTTON_SIZES[size],
+            'text-muted hover:bg-ink/10 hover:text-ink aria-pressed:text-ink',
+            className
+          )}
+          {...props}
+        />
+      }
     />
   )
 }

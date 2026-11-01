@@ -9,6 +9,10 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Decided
 
+- **shadcn/ui where it beats hand-made code, and its icon set** (the user's choice). Lucide for every icon;
+  shadcn's components (on Base UI, its default) for menus, tooltips and the switch, restyled to Trowel's
+  compact look and colours, without animations. Not for the simple controls (buttons, inputs), the pane
+  splits or the resizable side panels (shadcn's Resizable works in percentages, Trowel's panels in pixels).
 - **A sidebar with an activity bar, and a connection bar** (the user's choices, after Beekeeper Studio's
   layout). The left side has views for tables, saved queries and recent queries, and at its foot the
   connection's name and type, whose menu disconnects, edits or switches the connection. Saved queries lists
@@ -330,6 +334,19 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     the recent order updated); switching to a server that's down; Edit connection; Disconnect. The 9a, 9c,
     10a-10c, fixes, keyboard and save-prompt tests pass with their selectors updated (the sessions test
     once stopped partway and didn't again in three reruns).
+  - [x] **Lucide icons and shadcn/ui components** (asked for after the sidebar; see "Decided") — the 17 icons
+    are Lucide's (`lucide-react`), still named in `components/icons.tsx`. shadcn/ui (CLI 4.23, the `base-nova`
+    style on Base UI 1.9) replaces the hand-made menu: each tab's right-click menu is its ContextMenu, the
+    connection bar's menu its DropdownMenu (with a submenu for Switch connection); icon buttons, the
+    activity bar and Run/Cancel have its Tooltip (400 ms before the first, then at once); the Settings
+    checkbox is its Switch. The components are restyled to Trowel's tokens and sizes, without animations.
+    `cn` (clsx, tailwind-merge) now lets a caller's classes override a component's. Kept as they were:
+    buttons, inputs, the segmented pickers, side panels and pane splits, tab bars. Tested in the built app:
+    tooltip timing and placement; the tab menu's items, disabled ones, Split right moving the focus to the
+    new pane, the keyboard (Down, Enter, Escape returning the focus); the connection menu above the bar,
+    its submenu on hover and with Right and Left, Escape a level at a time, Disconnect; the Settings switch.
+    All earlier tests pass. Once, choosing Maximize pane with Enter left the menu open on "Restore panes";
+    it didn't happen again in four reruns and three focused attempts.
   - [ ] **10e. New Window** — opens another connect screen in a new window, from the File menu (the app menu
     now exists).
 - [ ] **11. Table tab** — 100 rows per page via `LIMIT`/`OFFSET`. Grid sort/filter become `ORDER BY`/`WHERE` with
