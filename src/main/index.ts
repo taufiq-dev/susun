@@ -1,8 +1,15 @@
-import { app, shell, BrowserWindow } from 'electron'
+import { app, nativeTheme, shell, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import { registerIpc } from './ipc'
+
+// The window's own background, which shows wherever the page hasn't painted: in the strip a quick
+// resize uncovers before the page lays out again at the new size. Electron's default is white, so
+// it matches the page's surface colour in the OS theme instead (--surface in main.css).
+function windowBackground(): string {
+  return nativeTheme.shouldUseDarkColors ? '#222328' : '#ffffff'
+}
 
 function createWindow(): void {
   // Create the browser window.
@@ -12,6 +19,7 @@ function createWindow(): void {
     minWidth: 960,
     minHeight: 600,
     show: false,
+    backgroundColor: windowBackground(),
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
@@ -53,6 +61,12 @@ app.whenReady().then(() => {
   })
 
   registerIpc()
+
+  // The page follows the OS theme by itself; the windows' backgrounds follow it here.
+  nativeTheme.on('updated', () => {
+    for (const window of BrowserWindow.getAllWindows())
+      window.setBackgroundColor(windowBackground())
+  })
 
   createWindow()
 
