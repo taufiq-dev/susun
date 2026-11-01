@@ -7,6 +7,18 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 - **License for Trowel** (MIT, GPLv3 or closed): needed before distributing it (step 13).
 
+## Later (noted, to look at after step 11)
+
+- Noticing a dropped connection or session: today a session the server ends stays broken until its tab
+  closes, and a dropped connection until Disconnect.
+- The rest of a table's right-click menu: Rename, Duplicate, Hide, SQL: Create (Postgres has no built-in
+  DDL dump, so Trowel would rebuild it), Export to file, Import from file.
+- A query still running on a tab whose SQL is saved closes with no prompt (the save prompt only asks about
+  unsaved SQL; Disconnect's old confirmation asked about running queries too).
+- Unsaved SQL is lost on quit when the user chooses Don't Save (keeping query tabs between launches would
+  remove the need to choose).
+- In macOS full screen the traffic lights hide, but the 80 px left for them in the top band stays empty.
+
 ## Decided
 
 - **shadcn/ui where it beats hand-made code, and its icon set** (the user's choice). Lucide for every icon;
