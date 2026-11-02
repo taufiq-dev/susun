@@ -115,11 +115,13 @@ function Message({ children }: { children: React.ReactNode }): React.JSX.Element
 }
 
 export function Results({
+  tabId,
   run,
   shortcut,
   onView,
   onShowStatement
 }: {
+  tabId: string
   run?: QueryRun
   shortcut: string
   onView: (view: View) => void
@@ -142,8 +144,8 @@ export function Results({
       />
     )
   }
-  if (run.total === 1) return <SingleResult run={run} />
-  return <ScriptResults run={run} onView={onView} onShowStatement={onShowStatement} />
+  if (run.total === 1) return <SingleResult tabId={tabId} run={run} />
+  return <ScriptResults tabId={tabId} run={run} onView={onView} onShowStatement={onShowStatement} />
 }
 
 function ErrorPanel({
@@ -168,7 +170,7 @@ function ErrorPanel({
   )
 }
 
-function SingleResult({ run }: { run: QueryRun }): React.JSX.Element {
+function SingleResult({ tabId, run }: { tabId: string; run: QueryRun }): React.JSX.Element {
   const s = run.statements[0]
   if (!s) {
     // Cancelled while the tab's session was opening.
@@ -184,15 +186,17 @@ function SingleResult({ run }: { run: QueryRun }): React.JSX.Element {
   }
   if (s.result.columns.length === 0) return <Message>The statement returned no rows.</Message>
   // A new grid for each run, so its columns are sized to the new result.
-  return <ResultGrid key={run.id} columns={s.result.columns} rows={s.result.rows} />
+  return <ResultGrid key={run.id} tabId={tabId} columns={s.result.columns} rows={s.result.rows} />
 }
 
 // A script's results: a tab for each statement that returned rows, and the list of statements.
 function ScriptResults({
+  tabId,
   run,
   onView,
   onShowStatement
 }: {
+  tabId: string
   run: QueryRun
   onView: (view: View) => void
   onShowStatement: (from: number, to: number) => void
@@ -247,6 +251,7 @@ function ScriptResults({
         {shown && 'result' in shown && shown.result.columns.length > 0 ? (
           <ResultGrid
             key={`${run.id}-${view}`}
+            tabId={tabId}
             columns={shown.result.columns}
             rows={shown.result.rows}
           />

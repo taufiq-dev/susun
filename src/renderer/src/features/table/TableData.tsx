@@ -1,9 +1,22 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { CellContextMenuEvent, ColDef, SortChangedEvent } from 'ag-grid-community'
+import type {
+  CellContextMenuEvent,
+  ColDef,
+  RowDataUpdatedEvent,
+  SelectionChangedEvent,
+  SortChangedEvent
+} from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
 import { countSql, selectPageSql, type Order } from '@shared/sql'
 import type { ColumnInfo, DbType } from '@shared/types'
-import { DEFAULT_COL_DEF, formatCell, gridTheme, sizeColumns } from '@renderer/components/grid'
+import {
+  DEFAULT_COL_DEF,
+  formatCell,
+  gridTheme,
+  ROW_SELECTION,
+  selectFocusedRow,
+  sizeColumns
+} from '@renderer/components/grid'
 import { NextIcon, PreviousIcon, RefreshIcon } from '@renderer/components/icons'
 import {
   ContextMenu,
@@ -91,6 +104,7 @@ export function TableData({
   columns: ColumnInfo[] | null
 }): React.JSX.Element {
   const updateTable = useTabs((s) => s.updateTable)
+  const selectRow = useTabs((s) => s.selectRow)
   const [page, setPage] = useState<Page | null>(null)
   const [reloads, setReloads] = useState(0)
   const [count, setCount] = useState<{ request: string; value: number | string } | null>(null)
@@ -221,6 +235,27 @@ export function TableData({
     if (e.data) setMenuCell({ row: e.data, column: names[index], index })
   }
 
+  // The Row panel shows the row with its unsaved changes.
+  const showRow = (row: GridRow | undefined): void =>
+    selectRow(tab.id, row && { id: row.id, columns: names, values: row.values })
+
+  const onSelectionChanged = (e: SelectionChangedEvent<GridRow>): void =>
+    showRow(e.api.getSelectedRows()[0])
+
+  // A page arrived or a cell changed, so the selected row's values may be new; the grid keeps it
+  // selected by its id. A tab that comes back gets a new grid: it selects the same row again and
+  // shows it. Without the row (it isn't on the page any more) there's nothing to show.
+  const onRowDataUpdated = (e: RowDataUpdatedEvent<GridRow>): void => {
+    const id = tab.selectedRow?.id
+    if (loading || id === undefined) return
+    const node = e.api.getRowNode(id)
+    if (node && !node.isSelected()) {
+      node.setSelected(true)
+      e.api.ensureNodeVisible(node, 'middle')
+    }
+    showRow(node?.data)
+  }
+
   const save = async (): Promise<void> => {
     setSaving(true)
     try {
@@ -267,6 +302,10 @@ export function TableData({
                 columnDefs={columnDefs}
                 defaultColDef={DEFAULT_COL_DEF}
                 loading={loading}
+                rowSelection={ROW_SELECTION}
+                onCellFocused={selectFocusedRow}
+                onSelectionChanged={onSelectionChanged}
+                onRowDataUpdated={onRowDataUpdated}
                 onFirstDataRendered={sizeColumns}
                 onSortChanged={onSortChanged}
                 onCellContextMenu={onCellContextMenu}

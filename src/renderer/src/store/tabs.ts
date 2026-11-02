@@ -46,12 +46,23 @@ export interface QueryRun {
   view?: number | 'statements'
 }
 
+// The row selected in a tab's grid, which the Row panel shows: as read, with a table tab's unsaved
+// changes applied. It is kept here because the tab's grid unmounts with the tab.
+export interface SelectedRow {
+  // A table tab's row, by its id in the grid (a page reloads, so its rows are new arrays). A query
+  // result's rows stay as they are in the store, so `values` itself finds the row.
+  id?: string
+  columns: string[]
+  values: unknown[]
+}
+
 export interface QueryTabState {
   id: string
   type: 'query'
   title: string
   sql: string
   run?: QueryRun
+  selectedRow?: SelectedRow
   // The tab's own database session (see `DbApi.openSession`), once its first run has opened it.
   sessionId?: string
   // The editor's share of the tab's height; the results get the rest.
@@ -76,6 +87,7 @@ export interface TableTabState {
   page: number
   order?: Order
   filter?: Filter
+  selectedRow?: SelectedRow
   // Changed cells not saved yet, by row (the row's key values as JSON). They outlast paging,
   // sorting and filtering, since a row is found by its primary key, not its place.
   edits?: Record<string, RowEdit>
@@ -148,6 +160,7 @@ interface TabsState {
   setRun(id: string, run: QueryRun): void
   setRunView(id: string, view: NonNullable<QueryRun['view']>): void
   setSession(id: string, sessionId: string): void
+  selectRow(id: string, row: SelectedRow | undefined): void
   reset(): void
 }
 
@@ -168,6 +181,12 @@ export function sameTable(a: TableRef, b: TableRef): boolean {
 export function focusedTab(s: TabsState): Tab | undefined {
   const activeId = findPane(s.root, s.focusedPaneId)?.activeId
   return activeId ? s.tabs.find((t) => t.id === activeId) : undefined
+}
+
+// The row the Row panel shows for the tab: none while a table tab shows its structure, where its
+// rows aren't to be seen.
+export function shownRow(tab: Tab | undefined): SelectedRow | undefined {
+  return tab?.type === 'table' && tab.view !== 'data' ? undefined : tab?.selectedRow
 }
 
 type Layout = Pick<TabsState, 'root' | 'focusedPaneId'>
@@ -410,12 +429,27 @@ export const useTabs = create<TabsState>()((set) => ({
       return { editorFraction, ...updateQueryTab(s, id, (t) => ({ ...t, editorFraction })) }
     }),
 
-  setRun: (id, run) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, run }))),
+  // A new run's rows are new, so the old selection goes (not on an update to the same run).
+  setRun: (id, run) =>
+    set((s) =>
+      updateQueryTab(s, id, (t) => ({
+        ...t,
+        run,
+        selectedRow: t.run?.id === run.id ? t.selectedRow : undefined
+      }))
+    ),
 
   setRunView: (id, view) =>
-    set((s) => updateQueryTab(s, id, (t) => (t.run ? { ...t, run: { ...t.run, view } } : t))),
+    set((s) =>
+      updateQueryTab(s, id, (t) =>
+        t.run ? { ...t, run: { ...t.run, view }, selectedRow: undefined } : t
+      )
+    ),
 
   setSession: (id, sessionId) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, sessionId }))),
+
+  selectRow: (id, selectedRow) =>
+    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, selectedRow } : t)) })),
 
   reset: () => set(initial())
 }))

@@ -40,6 +40,15 @@ const theme = EditorView.theme({
     outline: 'none'
   },
   '.cm-placeholder': { color: 'color-mix(in srgb, var(--muted) 70%, transparent)' },
+  '.cm-foldGutter .cm-gutterElement': { padding: '0 2px 0 6px' },
+  '.cm-foldPlaceholder': {
+    backgroundColor: 'transparent',
+    border: '1px solid var(--line)',
+    borderRadius: '3px',
+    color: 'var(--muted)',
+    margin: '0 2px',
+    padding: '0 4px'
+  },
   '.cm-tooltip': {
     backgroundColor: 'var(--surface)',
     color: 'var(--ink)',
@@ -60,6 +69,8 @@ const theme = EditorView.theme({
 
 const highlight = HighlightStyle.define([
   { tag: [t.keyword, t.typeName], color: 'var(--accent)' },
+  // JSON's keys (the Row panel).
+  { tag: t.propertyName, color: 'var(--accent)' },
   { tag: t.string, color: 'var(--syntax-string)' },
   { tag: [t.number, t.bool, t.null], color: 'var(--syntax-number)' },
   { tag: [t.lineComment, t.blockComment], color: 'var(--muted)', fontStyle: 'italic' },

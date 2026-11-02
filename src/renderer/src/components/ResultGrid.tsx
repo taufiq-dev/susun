@@ -1,14 +1,25 @@
 import { useMemo } from 'react'
-import type { ColDef } from 'ag-grid-community'
+import type { ColDef, FirstDataRenderedEvent, SelectionChangedEvent } from 'ag-grid-community'
 import { AgGridReact } from 'ag-grid-react'
-import { DEFAULT_COL_DEF, formatCell, gridTheme, sizeColumns } from './grid'
+import { useTabs } from '@renderer/store/tabs'
+import {
+  DEFAULT_COL_DEF,
+  formatCell,
+  gridTheme,
+  ROW_SELECTION,
+  selectFocusedRow,
+  sizeColumns
+} from './grid'
 
 // A read-only grid of query rows. Rows are arrays in `columns` order, so each column reads its
-// value by index: names can repeat (`select a.id, b.id`).
+// value by index: names can repeat (`select a.id, b.id`). The selected row goes in its tab, for the
+// Row panel.
 export function ResultGrid({
+  tabId,
   columns,
   rows
 }: {
+  tabId: string
   columns: string[]
   rows: unknown[][]
 }): React.JSX.Element {
@@ -25,13 +36,35 @@ export function ResultGrid({
     [columns]
   )
 
+  const onSelectionChanged = (e: SelectionChangedEvent<unknown[]>): void => {
+    const values = e.api.getSelectedRows()[0]
+    useTabs.getState().selectRow(tabId, values && { columns, values })
+  }
+
+  const onFirstDataRendered = (e: FirstDataRenderedEvent<unknown[]>): void => {
+    sizeColumns(e)
+    // A tab that comes back gets a new grid: it selects the same row again and shows it. The rows
+    // are the ones in the store, so the row is that same array.
+    const tab = useTabs.getState().tabs.find((t) => t.id === tabId)
+    const selected = tab?.selectedRow?.values
+    if (!selected) return
+    e.api.forEachNode((node) => {
+      if (node.data !== selected) return
+      node.setSelected(true)
+      e.api.ensureNodeVisible(node, 'middle')
+    })
+  }
+
   return (
     <AgGridReact<unknown[]>
       theme={gridTheme}
       rowData={rows}
       columnDefs={columnDefs}
       defaultColDef={DEFAULT_COL_DEF}
-      onFirstDataRendered={sizeColumns}
+      rowSelection={ROW_SELECTION}
+      onCellFocused={selectFocusedRow}
+      onSelectionChanged={onSelectionChanged}
+      onFirstDataRendered={onFirstDataRendered}
       enableCellTextSelection
       ensureDomOrder
       suppressDragLeaveHidesColumns

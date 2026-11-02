@@ -152,6 +152,7 @@ export function QueryTab({
 
       <div className="min-h-0 flex-1">
         <Results
+          tabId={tab.id}
           run={tab.run}
           shortcut={RUN_SHORTCUT}
           onView={(view) => setRunView(tab.id, view)}

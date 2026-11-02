@@ -443,10 +443,26 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     fixed while testing: a save whose error dialog failed left the footer on "Saving…".
     Not yet: inserting and deleting rows; editing a cell to an empty string when it was NULL (an untouched
     editor keeps NULL).
-- [ ] **12. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`
+- [x] **12. JSON viewer** — selected row as `JSON.stringify(row, null, 2)` in read-only CodeMirror with `json()`
   (folding included), plus a key filter box. Build the row object from `columns` (suffix repeated names, e.g.
   `id`, `id_2`). Convert first: `Uint8Array` → hex, Postgres `bigint` arrives as a
   string, dates → ISO strings. Postgres/MySQL JSON columns arrive parsed and show as nested objects.
+  The Row panel shows the focused pane's active tab's selected row. A row is selected by its focused cell,
+  so clicks and the arrow keys both move it. It is kept on the tab, so each tab has its own, and it comes back
+  (highlighted and scrolled to) when the tab does. It goes with a new run or another result of a script, and
+  when the row leaves a table's page; a table's structure view shows none. Unsaved changes show in it. The
+  filter matches keys at any depth, ignoring case, keeping the objects around a match, and stays as the row
+  changes. Differences from the plan above: dates stay as the database formats them (the client contract,
+  which keeps microseconds), rather than ISO strings. The JSON is written out key by key, since an object
+  would move integer-like column names to the front and lose a column named `__proto__`. NaN and Infinity
+  show as strings, since JSON would print them as null, which reads as NULL. A binary value shows its first
+  1,024 bytes and its size. SQLite has no JSON type, so JSON text there shows as a string. Tested in the built
+  app on Postgres, MariaDB and SQLite (`row.test.ts` covers the JSON; `tabs.test.ts` when the selection goes):
+  selecting by click and arrows, edits, Undo, Save, Refresh, paging, sorting, the structure view, tabs and
+  splits each keeping their row, scripts, filtering, folding, read-only, the panel off and on, and 5 MB of
+  text (about 0.65 s to select, in one measurement). Found and fixed while testing: `sizeColumns` capped widths
+  right after asking for auto-size, which the grid may put off until its cells have rendered, so one long value
+  could leave a column 700,000 px wide and the others off screen; the cap now goes with the request.
 - [ ] **13. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
   Developer account for signing and notarization. Check that SQLite works in the packaged app: its utility

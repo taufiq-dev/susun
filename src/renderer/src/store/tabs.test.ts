@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { panesOf } from './panes'
-import { useTabs } from './tabs'
+import { shownRow, useTabs, type QueryRun, type Tab } from './tabs'
 
 // Three query tabs in one pane, then whatever a test arranges.
 function setup(): string[] {
@@ -76,5 +76,55 @@ describe('moving tabs', () => {
     expect(panes().map((p) => p.tabs)).toEqual([[a, b], [c]])
     const root = useTabs.getState().root
     expect(root.type === 'split' && root.direction).toBe('column')
+  })
+})
+
+describe('the selected row', () => {
+  const row = { columns: ['a'], values: [1] }
+  const run = (id: number): QueryRun => ({ id, state: 'done', total: 1, statements: [] })
+  const tab = (): Tab => useTabs.getState().tabs[0]
+
+  beforeEach(() => useTabs.getState().reset())
+
+  it('stays through updates to the same run, and goes with a new run', () => {
+    const { openQuery, selectRow, setRun } = useTabs.getState()
+    openQuery()
+    setRun(tab().id, run(1))
+    selectRow(tab().id, row)
+    setRun(tab().id, { ...run(1), cancelling: true })
+    expect(tab().selectedRow).toBe(row)
+    setRun(tab().id, run(2))
+    expect(tab().selectedRow).toBeUndefined()
+  })
+
+  it('goes when a script shows another result', () => {
+    const { openQuery, selectRow, setRun, setRunView } = useTabs.getState()
+    openQuery()
+    setRun(tab().id, run(1))
+    selectRow(tab().id, row)
+    setRunView(tab().id, 'statements')
+    expect(tab().selectedRow).toBeUndefined()
+  })
+
+  it("is shown for a table's data, not its structure, and comes back with the data", () => {
+    const { openTable, selectRow, updateTable } = useTabs.getState()
+    openTable({ name: 't' })
+    selectRow(tab().id, row)
+    expect(shownRow(tab())).toBe(row)
+    updateTable(tab().id, { view: 'structure' })
+    expect(shownRow(tab())).toBeUndefined()
+    updateTable(tab().id, { view: 'data' })
+    expect(shownRow(tab())).toBe(row)
+  })
+
+  it('is kept per tab', () => {
+    const { openQuery, selectRow } = useTabs.getState()
+    openQuery()
+    openQuery()
+    const [first, second] = useTabs.getState().tabs
+    selectRow(first.id, row)
+    expect(useTabs.getState().tabs[0].selectedRow).toBe(row)
+    expect(useTabs.getState().tabs[1].selectedRow).toBeUndefined()
+    expect(second.selectedRow).toBeUndefined()
   })
 })

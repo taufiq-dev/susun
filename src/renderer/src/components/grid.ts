@@ -1,4 +1,11 @@
-import { themeQuartz, type ColDef, type FirstDataRenderedEvent } from 'ag-grid-community'
+import {
+  themeQuartz,
+  type CellFocusedEvent,
+  type ColDef,
+  type FirstDataRenderedEvent,
+  type RowSelectionOptions
+} from 'ag-grid-community'
+import { hex } from '@renderer/lib/hex'
 
 // What the result grid (ResultGrid) and the table tab's grid share.
 
@@ -34,25 +41,30 @@ export const MAX_AUTO_WIDTH = 360
 
 export const DEFAULT_COL_DEF: ColDef = { sortable: true, resizable: true, minWidth: 56 }
 
+// One selected row, the one the Row panel shows. It follows the focused cell (`selectFocusedRow`),
+// so the arrow keys move it as well as clicks.
+export const ROW_SELECTION: RowSelectionOptions = {
+  mode: 'singleRow',
+  checkboxes: false,
+  enableClickSelection: false
+}
+
+export function selectFocusedRow(e: CellFocusedEvent): void {
+  if (typeof e.rowIndex === 'number') e.api.getDisplayedRowAtIndex(e.rowIndex)?.setSelected(true)
+}
+
 export function formatCell(value: unknown): string {
   if (value === null || value === undefined) return 'NULL'
-  if (value instanceof Uint8Array) return hex(value)
+  // The first 32 bytes, so a large blob doesn't make a cell a megabyte long.
+  if (value instanceof Uint8Array) return hex(value, 32)
   if (value instanceof Date) return value.toISOString()
   // Postgres and MySQL JSON columns arrive parsed.
   if (typeof value === 'object') return JSON.stringify(value)
   return String(value)
 }
 
-// The first 32 bytes, so a large blob doesn't become a megabyte-long string.
-function hex(bytes: Uint8Array): string {
-  const shown = bytes.subarray(0, 32)
-  const digits = Array.from(shown, (b) => b.toString(16).padStart(2, '0')).join('')
-  return `0x${digits}${bytes.length > shown.length ? '…' : ''}`
-}
-
-// Fits each column to its contents, up to MAX_AUTO_WIDTH.
+// Fits each column to its contents, up to MAX_AUTO_WIDTH. The grid may put the sizing off until its
+// cells have rendered, so the limit goes along with it rather than being applied afterwards.
 export function sizeColumns(e: FirstDataRenderedEvent): void {
-  e.api.autoSizeAllColumns()
-  const wide = (e.api.getColumns() ?? []).filter((c) => c.getActualWidth() > MAX_AUTO_WIDTH)
-  e.api.setColumnWidths(wide.map((c) => ({ key: c, newWidth: MAX_AUTO_WIDTH })))
+  e.api.autoSizeAllColumns({ defaultMaxWidth: MAX_AUTO_WIDTH })
 }
