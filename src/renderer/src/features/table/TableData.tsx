@@ -26,6 +26,7 @@ import {
   ContextMenuTrigger
 } from '@renderer/components/shadcn/context-menu'
 import { Button, IconButton } from '@renderer/components/ui'
+import { useSession } from '@renderer/store/session'
 import { useTabs, type RowEdit, type TableTabState } from '@renderer/store/tabs'
 import { editable, rowKey, saveEdits } from './edits'
 import { FilterBar } from './FilterBar'
@@ -131,6 +132,10 @@ export function TableData({
       })
     )
   const countRequest = JSON.stringify(countSql(type, tab.table, tab.filter))
+  // A page that couldn't be read tries again when the connection comes back. One that could stays,
+  // with its selected row and scroll position.
+  const reconnects = useSession((s) => s.reconnects)
+  const retry = page !== null && 'error' in page ? reconnects : 0
 
   useEffect(() => {
     if (!request) return
@@ -151,7 +156,7 @@ export function TableData({
     return () => {
       current = false
     }
-  }, [connectionId, request, reloads])
+  }, [connectionId, request, reloads, retry])
 
   const countRows = (): void => {
     const { sql, params } = JSON.parse(countRequest) as { sql: string; params: unknown[] }

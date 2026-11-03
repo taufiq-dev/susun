@@ -47,6 +47,7 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   const list = useRef<HTMLDivElement>(null)
   const openTable = useTabs((s) => s.openTable)
   const type = useSession((s) => s.session?.type ?? 'postgres')
+  const reconnects = useSession((s) => s.reconnects)
   // The focused pane's table, if it shows one.
   const activeTable = useTabs((s) => {
     const tab = focusedTab(s)
@@ -70,7 +71,7 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
     return () => {
       current = false
     }
-  }, [connectionId, reloads])
+  }, [connectionId, reloads, reconnects])
 
   const reload = (): void => {
     setReloading(true)

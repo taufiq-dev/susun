@@ -23,6 +23,7 @@ export function TableTab({
 }): React.JSX.Element {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const type = useSession((s) => s.session?.type ?? 'postgres')
+  const reconnects = useSession((s) => s.reconnects)
   const updateTable = useTabs((s) => s.updateTable)
   const { schema, name } = tab.table
 
@@ -35,7 +36,7 @@ export function TableTab({
     return () => {
       current = false
     }
-  }, [connectionId, schema, name])
+  }, [connectionId, schema, name, reconnects])
 
   const columns = loaded && 'columns' in loaded ? loaded.columns : null
 

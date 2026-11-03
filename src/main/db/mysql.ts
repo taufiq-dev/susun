@@ -17,7 +17,7 @@ import {
   type TableRef
 } from '@shared/types'
 import type { DbClient } from './client'
-import { CONNECT_TIMEOUT_MS, connectError } from './errors'
+import { CONNECT_TIMEOUT_MS, KEEPALIVE_DELAY_MS, connectError } from './errors'
 import { tlsOptions } from './tls'
 
 const LIST_TABLES = `
@@ -36,12 +36,15 @@ const LIST_COLUMNS = `
   where table_schema = coalesce(?, database()) and table_name = ?
   order by ordinal_position`
 
+// The server's last word before it closes a connection: it was killed (MariaDB's error for it),
+// the server is shutting down, or it timed out idle (MySQL 8.0.24 and later).
+const CLOSING_ERRORS = new Set([1927, 1053, 4031])
+
 async function connected(config: ServerConnectionConfig): Promise<Connection> {
   const conn = await createConnection(connectionOptions(config)).catch((err) => {
     throw connectError(err, config)
   })
-  // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
-  // queries reject with their own error.
+  // A dropped connection emits 'error'; unhandled, it would crash the main process.
   conn.on('error', (err) => console.error('mysql connection error:', err.message))
   return conn
 }
@@ -57,6 +60,8 @@ function connectionOptions(config: ServerConnectionConfig): ConnectionOptions {
     // mysql2 checks the certificate's host name only when asked to.
     ssl: tls && { ...tls, verifyIdentity: tls.rejectUnauthorized },
     connectTimeout: CONNECT_TIMEOUT_MS,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: KEEPALIVE_DELAY_MS,
     // BIGINT and DECIMAL values that don't fit a JS number arrive as strings instead of being
     // rounded, so they display correctly and still match in a WHERE clause.
     supportBigNumbers: true,
@@ -69,11 +74,14 @@ function connectionOptions(config: ServerConnectionConfig): ConnectionOptions {
 // Runs a statement reading its rows as they arrive, keeping the first ROW_LIMIT and only counting
 // the rest. The server sends every row whatever the client does: stopping it would mean killing
 // the statement, which could leave a MariaDB INSERT ... RETURNING half done. Of a CALL's result
-// sets, only the first is kept.
+// sets, only the first is kept. `running` holds a function that fails the query while it runs:
+// mysql2 tells a query with no callback about a closed connection only by an 'error' event on the
+// connection, so without it the query would never settle.
 function streamQuery(
   conn: Connection,
   sql: string,
-  params: unknown[]
+  params: unknown[],
+  running: Set<(err: Error) => void>
 ): Promise<Omit<QueryResult, 'durationMs'>> {
   return new Promise((resolve, reject) => {
     let columns: string[] | undefined
@@ -83,6 +91,13 @@ function streamQuery(
     let total = 0
     let changed = 0
     let failed = false
+    const fail = (err: Error): void => {
+      failed = true
+      running.delete(fail)
+      reject(err)
+    }
+    // Before the query: on a closed connection, the event comes during the call.
+    running.add(fail)
     // The promise wrapper's query collects every row; the core connection's emits them one by one.
     const query = core(conn).query({ sql, rowsAsArray: true }, params)
     // Once per result, before its rows; undefined for one without rows.
@@ -97,12 +112,10 @@ function streamQuery(
         if (rows.length < ROW_LIMIT) rows.push(row)
       }
     })
-    query.on('error', (err) => {
-      failed = true
-      reject(err)
-    })
+    query.on('error', fail)
     query.on('end', () => {
       if (failed) return
+      running.delete(fail)
       if (!columns) resolve({ columns: [], rows: [], rowCount: changed })
       else resolve({ columns, rows, rowCount: total, truncated: total > ROW_LIMIT })
     })
@@ -117,7 +130,9 @@ function core(conn: Connection): CoreConnection {
 export class MysqlClient implements DbClient {
   private config: ServerConnectionConfig
   private conn?: Connection
-  private running = 0
+  // A function for each running query that fails it.
+  private running = new Set<(err: Error) => void>()
+  private lostListener?: (reason: string) => void
 
   constructor(config: ServerConnectionConfig) {
     this.config = config
@@ -130,15 +145,26 @@ export class MysqlClient implements DbClient {
     if (this.config.ssl === 'verify' && isIP(this.config.host)) {
       throw new Error("MySQL's SSL Verify mode needs the server's host name, not an IP address")
     }
-    this.conn = await connected(this.config)
+    const conn = await connected(this.config)
+    this.conn = conn
+    conn.on('error', (err) => {
+      if (this.conn === conn) this.lostListener?.(err.message)
+      for (const fail of this.running) fail(err)
+    })
   }
 
   // Cancels a running query first: the server doesn't notice a closed connection until it sends
   // something, so it would keep running the query.
   async disconnect(): Promise<void> {
     await this.cancel().catch((err) => console.error('mysql cancel failed:', err.message))
-    await this.conn?.end()
+    const conn = this.conn
+    // First, so that its ending doesn't count as losing it.
     this.conn = undefined
+    await conn?.end()
+  }
+
+  onLost(listener: (reason: string) => void): void {
+    this.lostListener = listener
   }
 
   async listTables(): Promise<TableInfo[]> {
@@ -163,12 +189,15 @@ export class MysqlClient implements DbClient {
   async query(sql: string, params: unknown[] = []): Promise<QueryResult> {
     const conn = this.connection()
     const start = performance.now()
-    this.running++
     try {
-      const result = await streamQuery(conn, sql, params)
+      const result = await streamQuery(conn, sql, params, this.running)
       return { ...result, durationMs: performance.now() - start }
-    } finally {
-      this.running--
+    } catch (err) {
+      const { errno } = err as { errno?: number }
+      if (errno && CLOSING_ERRORS.has(errno) && this.conn === conn) {
+        this.lostListener?.((err as Error).message)
+      }
+      throw err
     }
   }
 
@@ -176,7 +205,7 @@ export class MysqlClient implements DbClient {
   // execution was interrupted". The connection and its session stay.
   async cancel(): Promise<void> {
     const conn = this.conn
-    if (!conn || this.running === 0) return
+    if (!conn || this.running.size === 0) return
     const other = await connected(this.config)
     try {
       await other.query(`KILL QUERY ${Number(conn.threadId)}`)

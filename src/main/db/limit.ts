@@ -1,5 +1,5 @@
 // Leading whitespace, comments and opening parentheses, then the first word.
-const FIRST_WORD = /^(?:\s|\(|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*([a-z]+)/i
+export const FIRST_WORD = /^(?:\s|\(|--[^\n]*(?:\n|$)|\/\*[\s\S]*?\*\/)*([a-z]+)/i
 // A subquery that changes data, as in `with d as (delete from t returning *) select ...`.
 const CHANGING_SUBQUERY = /\((?:\s|--[^\n]*\n|\/\*[\s\S]*?\*\/)*(?:insert|update|delete|merge)\b/i
 

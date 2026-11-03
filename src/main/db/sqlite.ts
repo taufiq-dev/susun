@@ -29,6 +29,7 @@ export class SqliteClient implements DbClient {
   private ready: Promise<void> = Promise.resolve()
   private nextId = 0
   private pending = new Map<number, Pending>()
+  private lostListener?: (reason: string) => void
 
   constructor(config: SqliteConnectionConfig) {
     this.config = config
@@ -51,6 +52,10 @@ export class SqliteClient implements DbClient {
     if (!child) return
     this.stop(new Error('Connection closed'))
     child.kill()
+  }
+
+  onLost(listener: (reason: string) => void): void {
+    this.lostListener = listener
   }
 
   listTables(): Promise<TableInfo[]> {
@@ -87,10 +92,12 @@ export class SqliteClient implements DbClient {
       if (res.ok) pending.resolve(res.value)
       else pending.reject(new Error(res.message))
     })
-    // An uncaught exception in the process also ends it. A process replaced by `cancel` is no
-    // longer `this.child` and has nothing to reject.
+    // An uncaught exception in the process also ends it. A process ended by `disconnect`, or
+    // replaced by `cancel`, is no longer `this.child` and has nothing to reject.
     child.on('exit', () => {
-      if (this.child === child) this.stop(new Error('Connection closed'))
+      if (this.child !== child) return
+      this.lostListener?.('The SQLite process ended unexpectedly.')
+      this.stop(new Error('Connection closed'))
     })
     await new Promise<void>((resolve, reject) => {
       child.once('spawn', resolve)

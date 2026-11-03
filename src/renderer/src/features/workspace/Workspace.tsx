@@ -1,16 +1,24 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { PanelRightIcon } from '@renderer/components/icons'
 import { MainArea } from '@renderer/components/SidePanel'
 import { IconButton } from '@renderer/components/ui'
 import { RowPanel } from '@renderer/features/json-viewer/RowPanel'
 import { Sidebar } from '@renderer/features/sidebar/Sidebar'
-import type { Session } from '@renderer/store/session'
+import { useSession, type Session } from '@renderer/store/session'
 import { Panes } from './Panes'
 import { useWorkspaceShortcuts } from './shortcuts'
 
 export function Workspace({ session }: { session: Session }): React.JSX.Element {
   const [showRow, setShowRow] = useState(true)
   useWorkspaceShortcuts()
+
+  useEffect(
+    () =>
+      window.api.app.onConnectionChanged(({ connectionId, lost }) => {
+        useSession.getState().connectionChanged(connectionId, lost)
+      }),
+    []
+  )
 
   return (
     // The connection's database type sets the accent colour for the whole workspace.

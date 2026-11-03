@@ -17,7 +17,7 @@ import {
 } from '@shared/types'
 import type { DbClient } from './client'
 import { stopsAtLimit } from './limit'
-import { CONNECT_TIMEOUT_MS, NOT_POSTGRES, connectError } from './errors'
+import { CONNECT_TIMEOUT_MS, KEEPALIVE_DELAY_MS, NOT_POSTGRES, connectError } from './errors'
 import { tlsOptions } from './tls'
 
 // relkind: r table, p partitioned table, f foreign table, v view, m materialized view.
@@ -87,6 +87,8 @@ function clientConfig(config: ServerConnectionConfig): ClientConfig {
     // Explicitly false when off: left undefined, pg would read PGSSLMODE from the environment.
     ssl: tlsOptions(config.ssl) ?? false,
     connectionTimeoutMillis: CONNECT_TIMEOUT_MS,
+    keepAlive: true,
+    keepAliveInitialDelayMillis: KEEPALIVE_DELAY_MS,
     stream: () => new GuardedSocket(),
     application_name: 'Trowel',
     types: TYPES
@@ -113,8 +115,7 @@ class GuardedSocket extends Socket {
 
 async function connected(config: ServerConnectionConfig): Promise<Client> {
   const client = new Client(clientConfig(config))
-  // A dropped connection emits 'error'; unhandled, it would crash the main process. Later
-  // queries reject with their own error.
+  // A dropped connection emits 'error'; unhandled, it would crash the main process.
   client.on('error', (err) => console.error('postgres connection error:', err.message))
   await client.connect().catch((err) => {
     throw connectError(err, config)
@@ -128,14 +129,18 @@ export class PostgresClient implements DbClient {
   // The server process serving this connection, which a cancel targets.
   private pid?: number
   private running = 0
+  private lostListener?: (reason: string) => void
 
   constructor(config: ServerConnectionConfig) {
     this.config = config
   }
 
   async connect(): Promise<void> {
-    this.client = await connected(this.config)
-    const { rows } = await this.client.query<{ pid: number }>('select pg_backend_pid() as pid')
+    const client = await connected(this.config)
+    this.client = client
+    client.on('error', (err) => this.lost(client, err.message))
+    client.on('end', () => this.lost(client, 'Connection terminated'))
+    const { rows } = await client.query<{ pid: number }>('select pg_backend_pid() as pid')
     this.pid = rows[0].pid
   }
 
@@ -143,8 +148,14 @@ export class PostgresClient implements DbClient {
   // something, so it would keep running the query.
   async disconnect(): Promise<void> {
     await this.cancel().catch((err) => console.error('postgres cancel failed:', err.message))
-    await this.client?.end()
+    const client = this.client
+    // First, so that its ending doesn't count as losing it.
     this.client = undefined
+    await client?.end()
+  }
+
+  onLost(listener: (reason: string) => void): void {
+    this.lostListener = listener
   }
 
   async listTables(): Promise<TableInfo[]> {
@@ -198,6 +209,11 @@ export class PostgresClient implements DbClient {
         stopped: truncated && stopsAtLimit(sql),
         durationMs
       }
+    } catch (err) {
+      // The server's last word: it closes the connection next, but this rejects first.
+      const { severity } = err as { severity?: string }
+      if (severity === 'FATAL' || severity === 'PANIC') this.lost(client, (err as Error).message)
+      throw err
     } finally {
       this.running--
     }
@@ -219,5 +235,9 @@ export class PostgresClient implements DbClient {
   private connection(): Client {
     if (!this.client) throw new Error('Not connected')
     return this.client
+  }
+
+  private lost(client: Client, reason: string): void {
+    if (this.client === client) this.lostListener?.(reason)
   }
 }

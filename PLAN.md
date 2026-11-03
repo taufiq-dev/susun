@@ -9,8 +9,6 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Later (noted, to look at after step 11)
 
-- Noticing a dropped connection or session: today a session the server ends stays broken until its tab
-  closes, and a dropped connection until Disconnect.
 - The rest of a table's right-click menu: Rename, Duplicate, Hide, SQL: Create (Postgres has no built-in
   DDL dump, so Trowel would rebuild it), Export to file, Import from file.
 - A query still running on a tab whose SQL is saved closes with no prompt (the save prompt only asks about
@@ -95,6 +93,40 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   the tab's own, and mysql2 can't do it at all. Re-running with a higher limit would repeat a
   statement's changes. The table tab pages with its own `LIMIT`; getting every row of a big query would be
   an export to a file, not planned yet.
+- **A lost connection reconnects when next used, and is never replayed.** A session (`ReconnectingClient`,
+  `src/main/db/reconnecting.ts`, with unit tests) notices the driver's connection ending and replaces it at
+  its next call. Before this, on Postgres every run failed until the tab closed, and on MySQL any query after a
+  drop, or running during one, never settled, because mysql2 tells a query with no callback only through an
+  'error' event on the connection, so the tab said Running... for good.
+  - **Nothing runs twice.** A statement running when the connection went fails, saying it may not have
+    finished, since nobody can tell. A script stops there, as at any error.
+  - **A new connection isn't the old session.** If what ran on the session could have left something on it (an
+    open transaction, a setting, a temporary table, a lock), the next statement is held back with an error
+    saying what's gone, once, and the run after it goes ahead. Otherwise `commit` would do nothing and say
+    nothing, the second half of a transaction would commit by itself, and a statement could run under another
+    `search_path`. psql does the same. A session that only read and changed rows reconnects with no message
+    (`mayKeepState`: anything unrecognized counts as keeping state), because holding back every first run
+    would be a nuisance on a server that closes idle connections or a database that scales to zero.
+  - **No reconnecting in the background, and no pings.** Either would wake a serverless database that had
+    scaled to zero, and go on waking it. So the connection's own session reconnects when the sidebar or a table
+    tab next needs it, or on the connection bar's Reconnect. It holds no state, so it never holds anything back.
+  - **The connection bar says "Disconnected"**, in muted colours rather than as an alarm, since servers close
+    idle connections as a matter of course. It speaks for the connection's own session only; a tab's session
+    tells the tab, on its next run.
+  - **TCP keep-alive after 30 s idle**, on both server clients. A network drop sends nothing, so otherwise a
+    connection looks fine until a query hangs on it. The checks are below SQL, so they don't wake anything.
+  - An in-memory SQLite database is gone with its process, so that always says so, and the next run starts a
+    new, empty one.
+  Tested in the built app against Postgres 18 and MariaDB 13 (also over TLS) and SQLite, in
+  `dropped-e2e`: sessions killed idle, in a transaction, after SET and mid-query; the server's own idle timeouts
+  (`idle_session_timeout`, `wait_timeout`); a mid-script kill leaving the rest of the script unrun; the server
+  stopped and restarted (table list, table tab and Reconnect say why, then recover by themselves); Cancel
+  reaching the new connection; a kill during a save; no sessions left on the server afterwards; SQLite's
+  process killed, for a file and `:memory:`; through a proxy, a connection reset, and a network gone silent
+  (Cancel reports it after 10 s; closing the tab and Disconnect don't wait). A 50-second query and as long
+  idle stayed connected, keep-alive having started. Not tested: keep-alive noticing a really dead network,
+  which needs firewall rules (root); only that sockets get the option. A query sent after the network went, and
+  before keep-alive noticed, waits on the OS's own retransmission timeout; closing its tab works at once.
 
 ## Steps
 
@@ -146,7 +178,8 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   and `ping` handler; the window is now 1280x800 (min 960x600). Tested by driving the built app over the
   DevTools protocol, with screenshots in light and dark; the native file picker is untested.
   Not done: resizable side panels (since done, under step 10), keyboard shortcuts for tabs (Cmd+W would need a
-  custom app menu, since the default menu closes the window), and noticing a dropped connection.
+  custom app menu, since the default menu closes the window), and noticing a dropped connection (since done:
+  see "Decided").
 - [x] **9. Query tab** — in four parts, each committed on its own.
   - [x] **9a. Editor and results** — CodeMirror with `sql()`; Cmd+Enter runs the selection or whole editor.
     Results in AG Grid with row count and run time; show database errors in place of the grid. Register AG
@@ -217,8 +250,8 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     worked; a SQLite write behind another tab's open write transaction failed after 5.4 s with "database is
     locked", and worked after that tab committed. The step 9 tests still pass, including both dump restores.
     Not done: noticing a session that died (a server restart, a network drop, a serverless database scaling
-    to zero); the tab then shows the driver's error on each run until it is closed, as the connection's own
-    session already did.
+    to zero); the tab then showed the driver's error on each run until it was closed, as the connection's own
+    session did (since done: see "Decided").
   - [x] **10b. Split panes** — the tabs store holds a tree of panes (`store/panes.ts`), each with its tabs and
     active tab; splits run side by side or one above another, nested, with draggable splitters (also moved
     with the arrow keys; a pane isn't resized below 160 px wide or 100 px tall). One pane is focused (the

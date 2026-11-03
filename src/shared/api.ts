@@ -36,6 +36,9 @@ export interface DbApi {
   connect(config: ConnectionConfig, savedId?: string): Promise<string>
   // Closes the connection and its sessions.
   disconnect(connectionId: string): Promise<void>
+  // Replaces the connection's own session's connection if it has been lost, which otherwise happens
+  // when it is next used (`AppApi.onConnectionChanged` says when). Rejects if connecting fails.
+  reconnect(connectionId: string): Promise<void>
   // Opens another session on the connection and returns its id. Each query tab has one. An
   // in-memory SQLite database exists only in the connection's own session, so for one this
   // returns the connection id.
@@ -45,7 +48,11 @@ export interface DbApi {
   closeSession(sessionId: string): Promise<void>
   listTables(connectionId: string): Promise<TableInfo[]>
   listColumns(connectionId: string, table: TableRef): Promise<ColumnInfo[]>
-  // `sessionId` is from `openSession`, or a connection id for the connection's own session.
+  // `sessionId` is from `openSession`, or a connection id for the connection's own session. A
+  // session that has lost its connection reconnects first, unless it may have held state (an open
+  // transaction, a setting, a temporary table): then the first call rejects, saying what was lost,
+  // and the next reconnects. A statement running when the connection went rejects, and isn't sent
+  // again.
   query(sessionId: string, sql: string, params?: unknown[]): Promise<QueryResult>
   // Runs the UPDATEs in one transaction on a session of its own (so other tabs' queries on the
   // connection's own session can't run inside it), each of which must change exactly one row;
@@ -138,10 +145,18 @@ export type AppCommand =
   // unsaved tabs, then calls `closeWindow`, or `cancelClose` if the user cancels.
   | 'close-window'
 
+// That a connection's own session has lost its connection (the server closed it or the network
+// dropped it), or has a new one.
+export interface ConnectionChange {
+  connectionId: string
+  lost: boolean
+}
+
 // Messages the main process sends a window's page, by channel.
 export interface AppEvents {
   'app:command': AppCommand
   'app:settingsChanged': Settings
+  'app:connectionChanged': ConnectionChange
 }
 
 export interface AppApi {
@@ -156,6 +171,7 @@ export interface AppApi {
   // Listen for messages from the main process; each returns a function that stops listening.
   onCommand(listener: (command: AppCommand) => void): () => void
   onSettingsChanged(listener: (settings: Settings) => void): () => void
+  onConnectionChanged(listener: (change: ConnectionChange) => void): () => void
 }
 
 // How a handler's outcome crosses IPC. An error thrown in a handler would reach the renderer

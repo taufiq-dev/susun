@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import type { SavedConnection } from '@shared/types'
-import { LinkIcon, PencilIcon, PowerIcon, SwitchIcon } from '@renderer/components/icons'
+import {
+  DisconnectedIcon,
+  LinkIcon,
+  PencilIcon,
+  PowerIcon,
+  RefreshIcon,
+  SwitchIcon
+} from '@renderer/components/icons'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,10 +25,11 @@ import { DB_LABELS } from '@renderer/features/connect/draft'
 import {
   disconnect,
   editConnection,
+  reconnect,
   showAllConnections,
   switchConnection
 } from '@renderer/features/workspace/connection'
-import type { Session } from '@renderer/store/session'
+import { useSession, type Session } from '@renderer/store/session'
 
 // How many saved connections Switch connection lists.
 const RECENT = 6
@@ -34,12 +42,21 @@ function recentConnections(saved: SavedConnection[], currentId?: string): SavedC
     .slice(0, RECENT)
 }
 
-// The bottom of the sidebar: the connection's name and type. Clicking it opens a menu above it
-// (shadcn's DropdownMenu) to disconnect, edit the connection, or switch to another saved one.
+// The bottom of the sidebar: the connection's name and type, or that it has been lost. Clicking it
+// opens a menu above it (shadcn's DropdownMenu) to disconnect, edit the connection, switch to
+// another saved one or, once lost, reconnect. A lost connection isn't an alarm, since a server may
+// close idle ones as a matter of course, and it reconnects when next used.
 export function ConnectionBar({ session }: { session: Session }): React.JSX.Element {
   // The other saved connections, read each time the menu opens.
   const [others, setOthers] = useState<SavedConnection[] | null>(null)
   const [switchingTo, setSwitchingTo] = useState<string | null>(null)
+  const [reconnecting, setReconnecting] = useState(false)
+  const lost = useSession((s) => s.lost)
+
+  const onReconnect = (): void => {
+    setReconnecting(true)
+    void reconnect().finally(() => setReconnecting(false))
+  }
 
   const loadOthers = (): void => {
     window.api.connections.list().then(
@@ -57,21 +74,33 @@ export function ConnectionBar({ session }: { session: Session }): React.JSX.Elem
         render={
           <button
             type="button"
-            aria-label={`Connection: ${session.name}, ${DB_LABELS[session.type]}`}
-            title={session.detail}
+            aria-label={`Connection: ${session.name}, ${lost ? 'disconnected' : DB_LABELS[session.type]}`}
+            title={
+              lost
+                ? `The connection to ${session.detail} was lost. It reconnects when next used.`
+                : session.detail
+            }
             className="focus-ring flex h-9 w-full shrink-0 items-center gap-2 border-t border-line px-3 text-left hover:bg-ink/5 data-popup-open:bg-ink/5"
           >
-            <span className="text-accent">
-              <LinkIcon />
+            <span className={lost ? 'text-muted' : 'text-accent'}>
+              {lost ? <DisconnectedIcon /> : <LinkIcon />}
             </span>
             <span className="min-w-0 flex-1 truncate font-semibold">
               {switchingTo ? `Connecting to ${switchingTo}…` : session.name}
             </span>
-            <span className="shrink-0 text-[12px] text-muted">{DB_LABELS[session.type]}</span>
+            <span className="shrink-0 text-[12px] text-muted">
+              {reconnecting ? 'Reconnecting…' : lost ? 'Disconnected' : DB_LABELS[session.type]}
+            </span>
           </button>
         }
       />
       <DropdownMenuContent side="top" align="start" sideOffset={4} aria-label="Connection">
+        {lost && (
+          <DropdownMenuItem disabled={reconnecting} onClick={onReconnect}>
+            <RefreshIcon />
+            Reconnect
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => void disconnect()}>
           <PowerIcon />
           Disconnect

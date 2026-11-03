@@ -13,6 +13,7 @@ import {
 } from 'electron'
 import type {
   AppApi,
+  AppEvents,
   ConnectionsApi,
   DbApi,
   DialogApi,
@@ -25,7 +26,7 @@ import type {
 } from '@shared/api'
 import type { ConnectionConfig } from '@shared/types'
 import { listConnections, markUsed, removeConnection, saveConnection } from './connections'
-import { createClient, type DbClient } from './db'
+import { ReconnectingClient, createClient } from './db'
 import { errorMessage } from './db/errors'
 import {
   addHistory,
@@ -54,13 +55,13 @@ interface OpenConnection {
   config: ConnectionConfig
   // What its query files and history are filed under (library.ts).
   key: string
-  client: DbClient
+  client: ReconnectingClient
   owner: WebContents
   sessions: Set<string>
 }
 
 interface OpenSession {
-  client: DbClient
+  client: ReconnectingClient
   connectionId: string
 }
 
@@ -68,8 +69,24 @@ const openConnections = new Map<string, OpenConnection>()
 const openSessions = new Map<string, OpenSession>()
 const watchedOwners = new WeakSet<WebContents>()
 
+// An in-memory SQLite database exists only in one connection.
+function isInMemory(config: ConnectionConfig): boolean {
+  return config.type === 'sqlite' && config.file === ':memory:'
+}
+
+// A client for a session, which replaces its connection if it is lost.
+function sessionClient(
+  config: ConnectionConfig,
+  onChange?: (lost: boolean) => void
+): ReconnectingClient {
+  return new ReconnectingClient(() => createClient(config), {
+    inMemory: isInMemory(config),
+    onChange
+  })
+}
+
 // The client of a session, or of a connection's own session.
-function findClient(id: string): DbClient | undefined {
+function findClient(id: string): ReconnectingClient | undefined {
   return openSessions.get(id)?.client ?? openConnections.get(id)?.client
 }
 
@@ -80,7 +97,7 @@ function keyOf(connectionId: string): string {
   return open.key
 }
 
-function client(id: string): DbClient {
+function client(id: string): ReconnectingClient {
   const client = findClient(id)
   if (!client) throw new Error('Connection is closed')
   return client
@@ -123,22 +140,31 @@ function watchOwner(owner: WebContents): void {
 
 const db: Handlers<DbApi> = {
   async connect(event, config, savedId) {
-    const client = createClient(config)
-    await client.connect()
     const id = randomUUID()
+    const owner = event.sender
+    const client = sessionClient(config, (lost) => {
+      const channel: keyof AppEvents = 'app:connectionChanged'
+      if (!owner.isDestroyed()) owner.send(channel, { connectionId: id, lost })
+    })
+    await client.connect()
     const key = connectionKey(config, savedId)
-    openConnections.set(id, { config, key, client, owner: event.sender, sessions: new Set() })
+    openConnections.set(id, { config, key, client, owner, sessions: new Set() })
     if (savedId) markUsed(savedId)
-    watchOwner(event.sender)
+    watchOwner(owner)
     return id
   },
   disconnect: (_event, connectionId) => close(connectionId),
+  async reconnect(_event, connectionId) {
+    const open = openConnections.get(connectionId)
+    if (!open) throw new Error('Connection is closed')
+    await open.client.reconnect()
+  },
   async openSession(_event, connectionId) {
     const open = openConnections.get(connectionId)
     if (!open) throw new Error('Connection is closed')
     // A second connection to ':memory:' would be a new, empty database.
-    if (open.config.type === 'sqlite' && open.config.file === ':memory:') return connectionId
-    const client = createClient(open.config)
+    if (isInMemory(open.config)) return connectionId
+    const client = sessionClient(open.config)
     await client.connect()
     // Disconnected (or the window closed) while this was connecting.
     if (openConnections.get(connectionId) !== open) {
@@ -155,7 +181,7 @@ const db: Handlers<DbApi> = {
     const open = openConnections.get(connectionId)
     if (!open) throw new Error('Connection is closed')
     // An in-memory SQLite database exists only in the connection's own session.
-    const shared = open.config.type === 'sqlite' && open.config.file === ':memory:'
+    const shared = isInMemory(open.config)
     const client = shared ? open.client : createClient(open.config)
     if (!shared) await client.connect()
     try {
@@ -353,7 +379,7 @@ const settings: Handlers<SettingsApi> = {
 const IS_MAC = process.platform === 'darwin'
 
 // The `on...` methods listen in preload; they aren't handlers.
-type AppHandlersApi = Omit<AppApi, 'onCommand' | 'onSettingsChanged'>
+type AppHandlersApi = Omit<AppApi, 'onCommand' | 'onSettingsChanged' | 'onConnectionChanged'>
 
 const appHandlers: Handlers<AppHandlersApi> = {
   async confirmSave(event, titles, reason) {

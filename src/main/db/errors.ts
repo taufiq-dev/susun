@@ -4,6 +4,12 @@ import { withoutNodeHint } from './tls'
 // How long the clients wait for a connection to be set up.
 export const CONNECT_TIMEOUT_MS = 10_000
 
+// How long a connection sits idle before the OS starts checking that the other end is still there.
+// A network drop sends nothing, so without this a connection looks fine until a query has hung on
+// it for minutes. The checks are TCP's own, below SQL, so they don't keep a serverless database
+// awake.
+export const KEEPALIVE_DELAY_MS = 30_000
+
 // The code of the error `GuardedSocket` (postgres.ts) fails a connection with when the server
 // doesn't speak the Postgres protocol.
 export const NOT_POSTGRES = 'ERR_TROWEL_NOT_POSTGRES'

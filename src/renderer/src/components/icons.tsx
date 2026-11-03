@@ -22,6 +22,7 @@ import {
   RotateCw,
   Table2,
   Trash2,
+  Unplug,
   X,
   type LucideIcon
 } from 'lucide-react'
@@ -58,6 +59,7 @@ export const SplitRightIcon = sized(Columns2, NORMAL)
 export const MaximizeIcon = sized(Maximize2, NORMAL)
 export const RestoreIcon = sized(Minimize2, NORMAL)
 export const LinkIcon = sized(Link, NORMAL)
+export const DisconnectedIcon = sized(Unplug, NORMAL)
 export const PowerIcon = sized(Power, NORMAL)
 export const PencilIcon = sized(Pencil, NORMAL)
 export const SwitchIcon = sized(ArrowLeftRight, NORMAL)

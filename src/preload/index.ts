@@ -26,6 +26,7 @@ const api: Api = {
   db: {
     connect: (config, savedId) => invoke('db:connect', config, savedId),
     disconnect: (connectionId) => invoke('db:disconnect', connectionId),
+    reconnect: (connectionId) => invoke('db:reconnect', connectionId),
     openSession: (connectionId) => invoke('db:openSession', connectionId),
     closeSession: (sessionId) => invoke('db:closeSession', sessionId),
     applyChanges: (connectionId, statements) => invoke('db:applyChanges', connectionId, statements),
@@ -67,7 +68,8 @@ const api: Api = {
     closeWindow: () => invoke('app:closeWindow'),
     cancelClose: () => invoke('app:cancelClose'),
     onCommand: (listener) => listen('app:command', listener),
-    onSettingsChanged: (listener) => listen('app:settingsChanged', listener)
+    onSettingsChanged: (listener) => listen('app:settingsChanged', listener),
+    onConnectionChanged: (listener) => listen('app:connectionChanged', listener)
   }
 }
 

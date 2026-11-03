@@ -5,6 +5,7 @@ import { PostgresClient } from './postgres'
 import { SqliteClient } from './sqlite'
 
 export type { DbClient } from './client'
+export { ReconnectingClient } from './reconnecting'
 
 export function createClient(config: ConnectionConfig): DbClient {
   switch (config.type) {
