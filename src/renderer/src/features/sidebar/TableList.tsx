@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { SELECT_TOP_ROWS } from '@shared/sql'
-import type { DbType, TableInfo } from '@shared/types'
+import type { DbType, TableInfo, TableRef } from '@shared/types'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -27,14 +27,15 @@ import { copyName, drop, selectTop, truncate, viewData, viewStructure } from './
 
 type Loaded = { tables: TableInfo[] } | { error: string }
 
-// The tree's rows: schemas and tables. The tree is one Tab stop (the open table, or else the first
-// row), and the arrow keys move through it.
+// The tree's rows: schemas and tables. The tree is one Tab stop (the selected table, or else the
+// first row), and the arrow keys move through it.
 const ITEM = 'button[data-item]'
 
 // The sidebar's Tables view: a filter, a header with the count and its buttons, and the tables as
 // a tree with a folder for each Postgres schema, which opens and closes as an accordion. MySQL and
 // SQLite tables have no schema, so they're a flat list. While filtering, every match shows, closed
-// schemas or not.
+// schemas or not. Clicking a table selects it (as do the arrow keys); double-clicking it, or Enter,
+// opens it in a tab, so a click to look at the list doesn't open a tab.
 export function TableList({ connectionId }: { connectionId: string }): React.JSX.Element {
   const [loaded, setLoaded] = useState<Loaded | null>(null)
   const [reloads, setReloads] = useState(0)
@@ -53,6 +54,16 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
     const tab = focusedTab(s)
     return tab?.type === 'table' ? tab.table : null
   })
+  // The table last clicked or arrowed to, with the active table at the time. The selection is the
+  // focused pane's table, until a click picks another; once the active table changes (a table is
+  // opened, or another tab or pane is focused), it follows that again.
+  const [picked, setPicked] = useState<{ table: TableRef; active: TableRef | null } | null>(null)
+  const pickedNow =
+    picked &&
+    (picked.active === null || activeTable === null
+      ? picked.active === activeTable
+      : sameTable(picked.active, activeTable))
+  const selected = pickedNow ? picked.table : activeTable
 
   useEffect(() => {
     let current = true
@@ -100,8 +111,8 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   const visible = groups.flatMap(([schema, inSchema]) =>
     schema && !isOpen(schema) ? [] : inSchema
   )
-  const isActive = (t: TableInfo): boolean => activeTable !== null && sameTable(t, activeTable)
-  const current = visible.find(isActive) ?? visible[0]
+  const isSelected = (t: TableInfo): boolean => selected !== null && sameTable(t, selected)
+  const current = visible.find(isSelected) ?? visible[0]
   // With no table to stop on (every schema closed), the first schema is the Tab stop.
   const schemaStop = current ? undefined : groups[0]?.[0]
 
@@ -150,12 +161,10 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
           // the tree, where Enter opens the focused table (or opens or closes a schema).
           onKeyDown={(e) => {
             if (e.key !== 'ArrowDown' && e.key !== 'Enter') return
-            const tree = list.current
-            const stop = tree?.querySelector<HTMLElement>(`${ITEM}[tabindex="0"]`)
-            if (!tree || !stop) return
+            const stop = list.current?.querySelector<HTMLElement>(`${ITEM}[tabindex="0"]`)
+            if (!stop) return
             e.preventDefault()
-            const tableRows = tree.querySelectorAll<HTMLElement>(`${ITEM}[data-item=table]`)
-            if (e.key === 'Enter' && tableRows.length === 1) tableRows[0].click()
+            if (e.key === 'Enter' && visible.length === 1) openTable(visible[0])
             else stop.focus()
           }}
         />
@@ -215,8 +224,9 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
               key={t.name}
               table={t}
               nested={!!schema}
-              active={isActive(t)}
+              selected={isSelected(t)}
               tabStop={t === current}
+              onSelect={() => setPicked({ table: t, active: activeTable })}
               onOpen={() => openTable(t)}
               menu={
                 <TableMenu connectionId={connectionId} type={type} table={t} onDropped={reload} />
@@ -256,20 +266,23 @@ export function TableList({ connectionId }: { connectionId: string }): React.JSX
   )
 }
 
-// A table or view in the tree. Right-clicking it opens its menu (shadcn's ContextMenu).
+// A table or view in the tree. A click or the focus selects it, and a double-click or Enter opens
+// it. Right-clicking it opens its menu (shadcn's ContextMenu).
 function TableRow({
   table,
   nested,
-  active,
+  selected,
   tabStop,
+  onSelect,
   onOpen,
   menu
 }: {
   table: TableInfo
   // Inside a schema's folder, so indented under it.
   nested: boolean
-  active: boolean
+  selected: boolean
   tabStop: boolean
+  onSelect: () => void
   onOpen: () => void
   menu: React.JSX.Element
 }): React.JSX.Element {
@@ -282,13 +295,20 @@ function TableRow({
         data-schema={table.schema}
         role="treeitem"
         aria-level={nested ? 2 : 1}
-        aria-selected={active}
+        aria-selected={selected}
         tabIndex={tabStop ? 0 : -1}
         title={`${table.schema ? `${table.schema}.${table.name}` : table.name}${view ? ' (view)' : ''}`}
-        onClick={onOpen}
+        onFocus={onSelect}
+        onClick={onSelect}
+        onDoubleClick={onOpen}
+        onKeyDown={(e) => {
+          if (e.key !== 'Enter') return
+          e.preventDefault()
+          onOpen()
+        }}
         className={`focus-ring flex h-6 w-full items-center gap-1.5 pr-3 text-left ${
           nested ? 'pl-[42px]' : 'pl-3'
-        } ${active ? 'bg-accent/15 text-ink' : 'hover:bg-surface/70 data-popup-open:bg-surface/70'}`}
+        } ${selected ? 'bg-accent/15 text-ink' : 'hover:bg-surface/70 data-popup-open:bg-surface/70'}`}
       >
         <span className="text-muted">{view ? <ViewIcon /> : <TableIcon />}</span>
         <span className="truncate">{table.name}</span>

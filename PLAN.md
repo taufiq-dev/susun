@@ -413,6 +413,9 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     schema or steps into it, Left closes it or steps up to it, Enter opens a table or opens and closes a
     schema; Down or Enter in the filter reaches the first row. Tested in the built app: the tree, closing
     one schema and all of them, filtering into closed schemas, the keys, opening a table.
+    Later (asked for): a click or the arrow keys only select a table; double-clicking it or Enter opens it,
+    so looking through the list doesn't open tabs. The selection follows the focused pane's table again
+    once that changes.
   - [x] **A table's right-click menu** (asked for after the tree; the basic items first) — View data (a query
     tab running `select * … limit 100`, until the table tab shows data in step 11), View structure, Copy
     name, SQL: Select top 100 (the same, not run), Truncate… (tables only; a DELETE on SQLite) and Drop
