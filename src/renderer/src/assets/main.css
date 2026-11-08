@@ -1,4 +1,6 @@
 @import 'tailwindcss';
+/* React Flow, which draws the ER diagram. Layered, so Tailwind's utilities override it. */
+@import '@xyflow/react/dist/style.css' layer(components);
 
 /* Colours are CSS variables so they follow the OS theme. Each database type has its own colour,
    and `data-db="<type>"` on an element makes it the accent (--accent) for everything inside, so
@@ -107,6 +109,24 @@
 }
 
 @layer components {
+  /* The ER diagram in the app's colours. React Flow reads these variables (its own defaults are
+     the -default ones), so they follow the OS theme and the accent. */
+  .er-diagram {
+    --xy-background-color: var(--canvas);
+    --xy-background-pattern-color: color-mix(in srgb, var(--muted) 40%, transparent);
+    --xy-edge-stroke: color-mix(in srgb, var(--muted) 75%, transparent);
+    --xy-controls-button-background-color: var(--surface);
+    --xy-controls-button-background-color-hover: var(--sunken);
+    --xy-controls-button-color: var(--ink);
+    --xy-controls-button-color-hover: var(--ink);
+    --xy-controls-button-border-color: var(--line);
+    --xy-controls-box-shadow: 0 0 0 1px var(--line);
+    --xy-minimap-background-color: var(--surface);
+    --xy-minimap-mask-background-color: color-mix(in srgb, var(--canvas) 65%, transparent);
+    --xy-minimap-node-background-color: color-mix(in srgb, var(--muted) 45%, transparent);
+    --xy-attribution-background-color: transparent;
+  }
+
   /* A NULL in a result grid, told apart from the text 'NULL'. */
   .cell-null {
     color: var(--muted);

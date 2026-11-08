@@ -12,7 +12,10 @@ import {
   Folder,
   FolderOpen,
   History,
+  KeyRound,
+  LayoutGrid,
   Link,
+  Link2,
   Maximize2,
   Minimize2,
   PanelRight,
@@ -32,6 +35,8 @@ import {
 // They draw in the text colour (currentColor), so they follow the theme and the accent.
 
 // Sizes in pixels. Lucide draws on a 24px grid with 2px lines, so at 16px a line is 1.33px.
+// The ER diagram's column markers.
+const TINY = 12
 const SMALL = 14
 const NORMAL = 16
 // The activity bar's.
@@ -52,6 +57,10 @@ export const SchemaOpenIcon = sized(FolderOpen, SMALL)
 export const TableIcon = sized(Table2, SMALL)
 export const ViewIcon = sized(Eye, SMALL)
 
+// An ER diagram's columns: in the primary key, in a foreign key.
+export const PrimaryKeyIcon = sized(KeyRound, TINY)
+export const ForeignKeyIcon = sized(Link2, TINY)
+
 export const PlusIcon = sized(Plus, NORMAL)
 export const RefreshIcon = sized(RotateCw, NORMAL)
 export const PanelRightIcon = sized(PanelRight, NORMAL)
@@ -68,6 +77,8 @@ export const TrashIcon = sized(Trash2, NORMAL)
 // A table's pages.
 export const PreviousIcon = sized(ChevronLeft, NORMAL)
 export const NextIcon = sized(ChevronRight, NORMAL)
+// Lays an ER diagram out again, undoing the tables' moves.
+export const ResetLayoutIcon = sized(LayoutGrid, NORMAL)
 export const CollapseAllIcon = sized(ChevronsDownUp, NORMAL)
 export const ExpandAllIcon = sized(ChevronsUpDown, NORMAL)
 

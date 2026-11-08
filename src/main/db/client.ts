@@ -1,4 +1,4 @@
-import type { ColumnInfo, QueryResult, TableInfo, TableRef } from '@shared/types'
+import type { ColumnInfo, ForeignKeyInfo, QueryResult, TableInfo, TableRef } from '@shared/types'
 
 // One open connection to one database. Each implementation holds a single driver connection, so
 // calls run one at a time and a transaction spans calls.
@@ -8,6 +8,11 @@ export interface DbClient {
   disconnect(): Promise<void>
   listTables(): Promise<TableInfo[]>
   listColumns(table: TableRef): Promise<ColumnInfo[]>
+  // The columns of each table, in the order given; a table that isn't there has none. One query
+  // for them all, where `listColumns` would take a round trip each.
+  listColumnsOf(tables: TableRef[]): Promise<ColumnInfo[][]>
+  // Every foreign key in the database (on Postgres, in every schema but the system's), by table.
+  listForeignKeys(): Promise<ForeignKeyInfo[]>
   // Placeholders are `$1, $2` on Postgres and `?` on MySQL and SQLite.
   query(sql: string, params?: unknown[]): Promise<QueryResult>
   // Stops the query running on this connection, which then rejects. Does nothing if no query is

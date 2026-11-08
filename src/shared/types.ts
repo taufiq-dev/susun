@@ -65,6 +65,21 @@ export interface ColumnInfo {
   primaryKey: boolean
 }
 
+// A foreign key: `columns` of `table` refer to `referencedColumns` of `references`, pairwise in
+// order. A key of several columns lists them all.
+export interface ForeignKeyInfo {
+  // The constraint's name. SQLite's foreign keys have none.
+  name: string | null
+  table: TableRef
+  columns: string[]
+  references: TableRef
+  referencedColumns: string[]
+  // What happens to the row when the referenced row is updated or deleted, as the database words
+  // it, e.g. `CASCADE`, `SET NULL`, `NO ACTION`.
+  onUpdate: string
+  onDelete: string
+}
+
 // The most rows a query result keeps, so a large result can't fill the app's memory.
 export const ROW_LIMIT = 10_000
 

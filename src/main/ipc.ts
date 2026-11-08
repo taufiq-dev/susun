@@ -208,6 +208,8 @@ const db: Handlers<DbApi> = {
   },
   listTables: (_event, connectionId) => client(connectionId).listTables(),
   listColumns: (_event, connectionId, table) => client(connectionId).listColumns(table),
+  listColumnsOf: (_event, connectionId, tables) => client(connectionId).listColumnsOf(tables),
+  listForeignKeys: (_event, connectionId) => client(connectionId).listForeignKeys(),
   query: (_event, sessionId, sql, params) => client(sessionId).query(sql, params),
   cancel: async (_event, sessionId) => {
     await findClient(sessionId)?.cancel()

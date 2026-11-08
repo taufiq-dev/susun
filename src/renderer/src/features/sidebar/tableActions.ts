@@ -19,6 +19,11 @@ export function viewStructure(table: TableInfo): void {
   useTabs.getState().openTable(table, 'structure')
 }
 
+// Opens an ER diagram of the table and the tables its foreign keys link it to.
+export function erDiagram(table: TableInfo): void {
+  useTabs.getState().openDiagram(table)
+}
+
 // Opens a query tab with a SELECT of the table's first rows, not run.
 export function selectTop(type: DbType, table: TableInfo): void {
   useTabs.getState().openQuery(undefined, selectTopSql(type, table))
@@ -55,7 +60,8 @@ export async function truncate(
   if (confirmed) await run(connectionId, truncateSql(type, table), `Couldn’t empty “${name}”`)
 }
 
-// Drops the table or view, once the user confirms; then closes its tabs and calls `dropped`.
+// Drops the table or view, once the user confirms; then closes its tabs (its data and its diagrams)
+// and calls `dropped`.
 export async function drop(
   connectionId: string,
   type: DbType,
@@ -74,6 +80,8 @@ export async function drop(
   if (!confirmed) return
   if (!(await run(connectionId, dropSql(type, table), `Couldn’t drop “${name}”`))) return
   const { tabs, close } = useTabs.getState()
-  for (const tab of tabs) if (tab.type === 'table' && sameTable(tab.table, table)) close(tab.id)
+  for (const tab of tabs) {
+    if (tab.type !== 'query' && sameTable(tab.table, table)) close(tab.id)
+  }
   dropped()
 }

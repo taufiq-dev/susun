@@ -1,6 +1,7 @@
 import type {
   ColumnInfo,
   ConnectionConfig,
+  ForeignKeyInfo,
   HistoryEntry,
   NewHistoryEntry,
   QueryFileEntry,
@@ -48,6 +49,10 @@ export interface DbApi {
   closeSession(sessionId: string): Promise<void>
   listTables(connectionId: string): Promise<TableInfo[]>
   listColumns(connectionId: string, table: TableRef): Promise<ColumnInfo[]>
+  // The columns of each table, in the order given (none for a table that isn't there), in one query.
+  listColumnsOf(connectionId: string, tables: TableRef[]): Promise<ColumnInfo[][]>
+  // Every foreign key in the database (on Postgres, in every schema but the system's).
+  listForeignKeys(connectionId: string): Promise<ForeignKeyInfo[]>
   // `sessionId` is from `openSession`, or a connection id for the connection's own session. A
   // session that has lost its connection reconnects first, unless it may have held state (an open
   // transaction, a setting, a temporary table): then the first call rejects, saying what was lost,

@@ -7,6 +7,7 @@ import Database from 'better-sqlite3'
 import {
   ROW_LIMIT,
   type ColumnInfo,
+  type ForeignKeyInfo,
   type QueryResult,
   type TableInfo,
   type TableRef
@@ -58,6 +59,53 @@ const methods = {
       defaultValue: r.dflt_value,
       primaryKey: r.pk > 0
     }))
+  },
+
+  listColumnsOf(tables: TableRef[]): ColumnInfo[][] {
+    return tables.map((t) => methods.listColumns(t))
+  },
+
+  // pragma_foreign_key_list gives a row per column of each key (`id`), in order (`seq`). A key
+  // naming no columns of the table it refers to (`to` is null) refers to its primary key. The
+  // table it refers to is named as written, which may differ in case from the table's name.
+  listForeignKeys(): ForeignKeyInfo[] {
+    const tables = methods.listTables().filter((t) => t.type === 'table')
+    const named = new Map(tables.map((t) => [t.name.toLowerCase(), t.name]))
+    const keys: ForeignKeyInfo[] = []
+    for (const table of tables) {
+      const rows = database()
+        .prepare('select * from pragma_foreign_key_list(?) order by id, seq')
+        .all(table.name) as {
+        id: number
+        table: string
+        from: string
+        to: string | null
+        on_update: string
+        on_delete: string
+      }[]
+      const byId = Map.groupBy(rows, (r) => r.id)
+      for (const key of byId.values()) {
+        const first = key[0]
+        const references = named.get(first.table.toLowerCase()) ?? first.table
+        const referencedColumns = key.every((r) => r.to !== null)
+          ? key.map((r) => r.to as string)
+          : (
+              database()
+                .prepare('select name from pragma_table_info(?) where pk > 0 order by pk')
+                .all(references) as { name: string }[]
+            ).map((c) => c.name)
+        keys.push({
+          name: null,
+          table: { name: table.name },
+          columns: key.map((r) => r.from),
+          references: { name: references },
+          referencedColumns,
+          onUpdate: first.on_update,
+          onDelete: first.on_delete
+        })
+      }
+    }
+    return keys
   },
 
   query(sql: string, params: unknown[] = []): QueryResult {

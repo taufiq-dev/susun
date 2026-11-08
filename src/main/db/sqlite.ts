@@ -1,6 +1,7 @@
 import { utilityProcess, type UtilityProcess } from 'electron'
 import type {
   ColumnInfo,
+  ForeignKeyInfo,
   QueryResult,
   SqliteConnectionConfig,
   TableInfo,
@@ -64,6 +65,14 @@ export class SqliteClient implements DbClient {
 
   listColumns(table: TableRef): Promise<ColumnInfo[]> {
     return this.call('listColumns', table)
+  }
+
+  listColumnsOf(tables: TableRef[]): Promise<ColumnInfo[][]> {
+    return this.call('listColumnsOf', tables)
+  }
+
+  listForeignKeys(): Promise<ForeignKeyInfo[]> {
+    return this.call('listForeignKeys')
   }
 
   query(sql: string, params?: unknown[]): Promise<QueryResult> {

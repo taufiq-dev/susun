@@ -11,6 +11,7 @@ import {
 import {
   ROW_LIMIT,
   type ColumnInfo,
+  type ForeignKeyInfo,
   type QueryResult,
   type ServerConnectionConfig,
   type TableInfo,
@@ -35,6 +36,33 @@ const LIST_COLUMNS = `
   from information_schema.columns
   where table_schema = coalesce(?, database()) and table_name = ?
   order by ordinal_position`
+
+// LIST_COLUMNS for several tables: `(?, ?)` pairs of schema and name, as many as there are tables,
+// replace TABLES. Each row says whether it is in the connection's own database.
+const LIST_COLUMNS_OF = `
+  select table_schema = database() as own, table_schema as table_schema, table_name as table_name,
+    column_name as name,
+    column_type as data_type,
+    is_nullable = 'YES' as nullable,
+    column_default as default_value,
+    column_key = 'PRI' as primary_key
+  from information_schema.columns
+  where (table_schema, table_name) in (TABLES)
+  order by table_schema, table_name, ordinal_position`
+
+// The foreign keys of the connection's database's tables, a row per column, in order. One may
+// refer to a table in another database.
+const LIST_FOREIGN_KEYS = `
+  select k.constraint_name as name, k.table_name as table_name, k.column_name as column_name,
+    k.referenced_table_schema = database() as own, k.referenced_table_schema as ref_schema,
+    k.referenced_table_name as ref_table, k.referenced_column_name as ref_column,
+    r.update_rule as on_update, r.delete_rule as on_delete
+  from information_schema.key_column_usage k
+  join information_schema.referential_constraints r
+    on r.constraint_schema = k.constraint_schema and r.constraint_name = k.constraint_name
+    and r.table_name = k.table_name
+  where k.table_schema = database() and k.referenced_table_name is not null
+  order by k.table_name, k.constraint_name, k.ordinal_position`
 
 // The server's last word before it closes a connection: it was killed (MariaDB's error for it),
 // the server is shutting down, or it timed out idle (MySQL 8.0.24 and later).
@@ -184,6 +212,57 @@ export class MysqlClient implements DbClient {
       defaultValue: r.default_value,
       primaryKey: Boolean(r.primary_key)
     }))
+  }
+
+  async listColumnsOf(tables: TableRef[]): Promise<ColumnInfo[][]> {
+    const columns: ColumnInfo[][] = tables.map(() => [])
+    if (tables.length === 0) return columns
+    const [rows] = await this.connection().query<RowDataPacket[]>(
+      LIST_COLUMNS_OF.replace(
+        'TABLES',
+        tables.map(() => '(coalesce(?, database()), ?)').join(', ')
+      ),
+      tables.flatMap((t) => [t.schema ?? null, t.name])
+    )
+    // A table without a schema is in the connection's own database.
+    const key = (schema: string | null, name: string): string => `${schema ?? ''}\0${name}`
+    const byTable = new Map<string, ColumnInfo[]>()
+    for (const r of rows) {
+      const k = key(r.own ? null : r.table_schema, r.table_name)
+      let list = byTable.get(k)
+      if (!list) byTable.set(k, (list = []))
+      list.push({
+        name: r.name,
+        dataType: r.data_type,
+        nullable: Boolean(r.nullable),
+        defaultValue: r.default_value,
+        primaryKey: Boolean(r.primary_key)
+      })
+    }
+    return tables.map((t) => byTable.get(key(t.schema ?? null, t.name)) ?? [])
+  }
+
+  async listForeignKeys(): Promise<ForeignKeyInfo[]> {
+    const [rows] = await this.connection().query<RowDataPacket[]>(LIST_FOREIGN_KEYS)
+    const keys: ForeignKeyInfo[] = []
+    for (const r of rows) {
+      let last = keys.at(-1)
+      if (!last || last.name !== r.name || last.table.name !== r.table_name) {
+        last = {
+          name: r.name,
+          table: { name: r.table_name },
+          columns: [],
+          references: r.own ? { name: r.ref_table } : { schema: r.ref_schema, name: r.ref_table },
+          referencedColumns: [],
+          onUpdate: r.on_update,
+          onDelete: r.on_delete
+        }
+        keys.push(last)
+      }
+      last.columns.push(r.column_name)
+      last.referencedColumns.push(r.ref_column)
+    }
+    return keys
   }
 
   async query(sql: string, params: unknown[] = []): Promise<QueryResult> {

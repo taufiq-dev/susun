@@ -500,6 +500,22 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   text (about 0.65 s to select, in one measurement). Found and fixed while testing: `sizeColumns` capped widths
   right after asking for auto-size, which the grid may put off until its cells have rendered, so one long value
   could leave a column 700,000 px wide and the others off screen; the cap now goes with the request.
+- [x] **ER diagram** (asked for after step 12) — "ER Diagram" in a table's right-click menu (not a view's)
+  opens a tab drawing the table, the tables its foreign keys refer to and those referring to it (Related), or
+  every table of its schema (Whole schema; on MySQL and SQLite, All tables), with each table's columns and
+  types, a key on the primary key, a link on foreign key columns (whose tooltip says what they refer to), and a
+  line per foreign key, from a crow's foot at the table with the key to a bar at the table it refers to. Drawn
+  with React Flow, laid out with dagre (see `CLAUDE.md`): pan, zoom, fit, an overview for more than 8 tables;
+  tables drag, and where they were left (and the pan and zoom) come back with the tab; Reset layout; Reload;
+  hovering or selecting a table lights its lines; double-clicking a table or Enter opens its data; Split
+  copies the tab (fitting its own pane); dropping a table closes its diagrams. New `api.db.listColumnsOf` and
+  `listForeignKeys`. Tested in the built app on Postgres (a scratch database: a self-reference, a composite
+  key, a key from another schema, a partitioned table), SQLite (a reference to the primary key without naming
+  it, a table name in another case, a composite key out of column order) and MariaDB (a scratch server: a key
+  into another database, a composite key), and on a local 76-table Postgres schema with 91 foreign keys (the
+  whole schema loads in about half a second). Found while testing: a schema where most tables refer to one
+  stacked them in a column too tall to read once fitted, so tall ranks now wrap, and a diagram that can't fit
+  readably opens at 80% on its own table rather than at 10-25%. `model.test.ts` covers the model.
 - [ ] **13. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
   Developer account for signing and notarization. Check that SQLite works in the packaged app: its utility

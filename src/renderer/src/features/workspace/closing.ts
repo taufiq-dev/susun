@@ -5,13 +5,15 @@ import { hasEdits, saveEdits } from '@renderer/features/table/edits'
 import { useTabs, type Tab } from '@renderer/store/tabs'
 
 // Whether closing the tab would lose something: a query tab's unsaved SQL, or a table tab's
-// changed rows.
+// changed rows. A diagram has nothing to lose.
 export function isUnsaved(tab: Tab): boolean {
+  if (tab.type === 'diagram') return false
   return tab.type === 'query' ? isDirty(tab) : hasEdits(tab)
 }
 
 // Saves it: the SQL to its file, or the rows to the table. Resolves to whether it did.
 function saveChanges(tab: Tab): Promise<boolean> {
+  if (tab.type === 'diagram') return Promise.resolve(true)
   return tab.type === 'query' ? saveTab(tab.id) : saveEdits(tab.id)
 }
 

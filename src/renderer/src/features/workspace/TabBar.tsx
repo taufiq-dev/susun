@@ -44,7 +44,8 @@ function focusFocusedPane(): void {
 // A tab's tooltip: a query file's path, or a table's schema-qualified name.
 function tabTitle(tab: Tab): string {
   if (tab.type === 'query') return tab.file?.path ?? tab.title
-  return tab.table.schema ? `${tab.table.schema}.${tab.title}` : tab.title
+  const name = tab.table.schema ? `${tab.table.schema}.${tab.table.name}` : tab.table.name
+  return tab.type === 'diagram' ? `ER diagram of ${name}` : name
 }
 
 // A pane's tabs. `focused` marks the pane that New query and the sidebar act on, shown on its

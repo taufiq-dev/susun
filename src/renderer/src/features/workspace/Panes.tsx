@@ -1,5 +1,6 @@
 import type { DbType } from '@shared/types'
 import { Button } from '@renderer/components/ui'
+import { DiagramTab } from '@renderer/features/diagram/DiagramTab'
 import { QueryTab } from '@renderer/features/query/QueryTab'
 import { TableTab } from '@renderer/features/table/TableTab'
 import { useState } from 'react'
@@ -234,6 +235,9 @@ function PaneView({ pane, connectionId, dbType }: Props & { pane: Pane }): React
         )}
         {active?.type === 'table' && (
           <TableTab key={active.id} tab={active} connectionId={connectionId} />
+        )}
+        {active?.type === 'diagram' && (
+          <DiagramTab key={active.id} tab={active} connectionId={connectionId} />
         )}
         {!active && (
           <div className="flex h-full flex-col items-center justify-center gap-3">

@@ -32,6 +32,8 @@ const api: Api = {
     applyChanges: (connectionId, statements) => invoke('db:applyChanges', connectionId, statements),
     listTables: (connectionId) => invoke('db:listTables', connectionId),
     listColumns: (connectionId, table) => invoke('db:listColumns', connectionId, table),
+    listColumnsOf: (connectionId, tables) => invoke('db:listColumnsOf', connectionId, tables),
+    listForeignKeys: (connectionId) => invoke('db:listForeignKeys', connectionId),
     query: (sessionId, sql, params) => invoke('db:query', sessionId, sql, params),
     cancel: (sessionId) => invoke('db:cancel', sessionId)
   },

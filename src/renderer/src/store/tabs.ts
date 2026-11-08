@@ -107,7 +107,30 @@ export type TableTabChanges = Partial<
   Pick<TableTabState, 'view' | 'page' | 'order' | 'filter' | 'edits'>
 >
 
-export type Tab = QueryTabState | TableTabState
+// An ER diagram: the tables around `table`, with their columns and the foreign keys between them.
+export interface DiagramTabState {
+  id: string
+  type: 'diagram'
+  title: string
+  // The table it was opened on, which it is drawn around.
+  table: TableRef
+  scope: DiagramScope
+  // Where the user has dragged tables to, by table key (`tableKey` in features/diagram/model.ts);
+  // the others are where the layout puts them.
+  positions?: Record<string, { x: number; y: number }>
+  // The pan and zoom as the user left them. Until they move it, the diagram fits the tab.
+  viewport?: { x: number; y: number; zoom: number }
+  // A diagram has no rows to select (declared so any tab's `selectedRow` can be read).
+  selectedRow?: never
+}
+
+// The tables a diagram shows: its table and those a foreign key links it to, or every table in its
+// schema (on MySQL and SQLite, its database).
+export type DiagramScope = 'related' | 'all'
+
+export type DiagramTabChanges = Partial<Pick<DiagramTabState, 'scope' | 'positions' | 'viewport'>>
+
+export type Tab = QueryTabState | TableTabState | DiagramTabState
 
 interface TabsState {
   tabs: Tab[]
@@ -134,6 +157,10 @@ interface TabsState {
   // `view` if given.
   openTable(table: TableRef, view?: TableView): void
   updateTable(id: string, changes: TableTabChanges): void
+  // Activates a diagram tab on the table if one is open (the focused pane's, or else another
+  // pane's), or opens one in the focused pane.
+  openDiagram(table: TableRef): void
+  updateDiagram(id: string, changes: DiagramTabChanges): void
   // Activates the tab in its pane, and focuses the pane.
   activate(tabId: string): void
   focusPane(paneId: string): void
@@ -186,7 +213,8 @@ export function focusedTab(s: TabsState): Tab | undefined {
 // The row the Row panel shows for the tab: none while a table tab shows its structure, where its
 // rows aren't to be seen.
 export function shownRow(tab: Tab | undefined): SelectedRow | undefined {
-  return tab?.type === 'table' && tab.view !== 'data' ? undefined : tab?.selectedRow
+  if (!tab || tab.type === 'diagram') return undefined
+  return tab.type === 'table' && tab.view !== 'data' ? undefined : tab.selectedRow
 }
 
 type Layout = Pick<TabsState, 'root' | 'focusedPaneId'>
@@ -248,6 +276,14 @@ function updateTableTab(
   update: (tab: TableTabState) => TableTabState
 ): Pick<TabsState, 'tabs'> {
   return { tabs: s.tabs.map((t) => (t.id === id && t.type === 'table' ? update(t) : t)) }
+}
+
+function updateDiagramTab(
+  s: TabsState,
+  id: string,
+  update: (tab: DiagramTabState) => DiagramTabState
+): Pick<TabsState, 'tabs'> {
+  return { tabs: s.tabs.map((t) => (t.id === id && t.type === 'diagram' ? update(t) : t)) }
 }
 
 function updateQueryTab(
@@ -317,6 +353,31 @@ export const useTabs = create<TabsState>()((set) => ({
       return { tabs: [...s.tabs, tab], ...addTab(s, targetPane(s).id, tab.id) }
     }),
 
+  openDiagram: (table) =>
+    set((s) => {
+      const open = s.tabs.filter((t) => t.type === 'diagram' && sameTable(t.table, table))
+      const focused = findPane(s.root, s.focusedPaneId)
+      const existing = open.find((t) => focused?.tabIds.includes(t.id)) ?? open[0]
+      const pane = existing && paneOfTab(s.root, existing.id)
+      if (existing && pane) {
+        return {
+          root: updatePane(s.root, pane.id, (p) => ({ ...p, activeId: existing.id })),
+          focusedPaneId: pane.id
+        }
+      }
+      const tab: Tab = {
+        id: crypto.randomUUID(),
+        type: 'diagram',
+        title: `ER: ${table.name}`,
+        table: { schema: table.schema, name: table.name },
+        scope: 'related'
+      }
+      return { tabs: [...s.tabs, tab], ...addTab(s, targetPane(s).id, tab.id) }
+    }),
+
+  updateDiagram: (id, changes) =>
+    set((s) => updateDiagramTab(s, id, (t) => ({ ...t, ...changes }))),
+
   activate: (tabId) =>
     set((s) => {
       const pane = paneOfTab(s.root, tabId)
@@ -348,8 +409,11 @@ export const useTabs = create<TabsState>()((set) => ({
               ...newQueryTab(s, tab.sql, tab.editorFraction),
               ...(tab.file && { title: tab.title, file: tab.file })
             }
-          : // The copy shows the same table, without the original's unsaved changes.
-            { ...tab, id: crypto.randomUUID(), edits: undefined }
+          : tab.type === 'table'
+            ? // The copy shows the same table, without the original's unsaved changes.
+              { ...tab, id: crypto.randomUUID(), edits: undefined }
+            : // The copy fits its own pane.
+              { ...tab, id: crypto.randomUUID(), viewport: undefined }
       const target = newPane([copy.id])
       return {
         tabs: [...s.tabs, copy],
@@ -449,7 +513,9 @@ export const useTabs = create<TabsState>()((set) => ({
   setSession: (id, sessionId) => set((s) => updateQueryTab(s, id, (t) => ({ ...t, sessionId }))),
 
   selectRow: (id, selectedRow) =>
-    set((s) => ({ tabs: s.tabs.map((t) => (t.id === id ? { ...t, selectedRow } : t)) })),
+    set((s) => ({
+      tabs: s.tabs.map((t) => (t.id === id && t.type !== 'diagram' ? { ...t, selectedRow } : t))
+    })),
 
   reset: () => set(initial())
 }))

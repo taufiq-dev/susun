@@ -10,6 +10,7 @@ import Cursor from 'pg-cursor'
 import {
   ROW_LIMIT,
   type ColumnInfo,
+  type ForeignKeyInfo,
   type QueryResult,
   type ServerConnectionConfig,
   type TableInfo,
@@ -47,6 +48,60 @@ const LIST_COLUMNS = `
   where n.nspname = coalesce($1, current_schema()) and c.relname = $2
     and a.attnum > 0 and not a.attisdropped
   order by a.attnum`
+
+// The columns of several tables at once, as LIST_COLUMNS gives them, each row with its table's
+// place in the arrays of schemas and names (from 1).
+const LIST_COLUMNS_OF = `
+  select t.place,
+    a.attname as name,
+    format_type(a.atttypid, a.atttypmod) as data_type,
+    not a.attnotnull as nullable,
+    pg_get_expr(d.adbin, d.adrelid) as default_value,
+    pk.indrelid is not null as primary_key
+  from unnest($1::text[], $2::text[]) with ordinality as t(schema, name, place)
+  join pg_namespace n on n.nspname = coalesce(t.schema, current_schema())
+  join pg_class c on c.relnamespace = n.oid and c.relname = t.name
+  join pg_attribute a on a.attrelid = c.oid
+  left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+  left join pg_index pk
+    on pk.indrelid = a.attrelid and pk.indisprimary and a.attnum = any(pk.indkey)
+  where a.attnum > 0 and not a.attisdropped
+  order by t.place, a.attnum`
+
+// Foreign keys between the tables LIST_TABLES lists. A key on a partitioned table, or to one, is
+// copied onto its partitions, which are left out here as they are there.
+const LIST_FOREIGN_KEYS = `
+  select c.conname as name,
+    tn.nspname as schema, t.relname as table,
+    rn.nspname as ref_schema, r.relname as ref_table,
+    array(
+      select a.attname::text from unnest(c.conkey) with ordinality k(num, place)
+      join pg_attribute a on a.attrelid = c.conrelid and a.attnum = k.num order by k.place
+    ) as columns,
+    array(
+      select a.attname::text from unnest(c.confkey) with ordinality k(num, place)
+      join pg_attribute a on a.attrelid = c.confrelid and a.attnum = k.num order by k.place
+    ) as ref_columns,
+    c.confupdtype as on_update, c.confdeltype as on_delete
+  from pg_constraint c
+  join pg_class t on t.oid = c.conrelid
+  join pg_namespace tn on tn.oid = t.relnamespace
+  join pg_class r on r.oid = c.confrelid
+  join pg_namespace rn on rn.oid = r.relnamespace
+  where c.contype = 'f' and not t.relispartition and not r.relispartition
+    and tn.nspname not in ('pg_catalog', 'information_schema')
+    and tn.nspname not like 'pg\\_toast%'
+    and tn.nspname not like 'pg\\_temp\\_%'
+  order by tn.nspname, t.relname, c.conname`
+
+// pg_constraint's codes for a foreign key's actions.
+const FK_ACTIONS: Record<string, string> = {
+  a: 'NO ACTION',
+  r: 'RESTRICT',
+  c: 'CASCADE',
+  n: 'SET NULL',
+  d: 'SET DEFAULT'
+}
 
 // Dates and times arrive as text, as the server formats them. As JS Dates they would lose
 // microseconds, and a `timestamp` (without time zone) would be read in this computer's time zone.
@@ -183,6 +238,53 @@ export class PostgresClient implements DbClient {
       nullable: r.nullable,
       defaultValue: r.default_value,
       primaryKey: r.primary_key
+    }))
+  }
+
+  async listColumnsOf(tables: TableRef[]): Promise<ColumnInfo[][]> {
+    const columns: ColumnInfo[][] = tables.map(() => [])
+    if (tables.length === 0) return columns
+    const { rows } = await this.connection().query<{
+      place: string
+      name: string
+      data_type: string
+      nullable: boolean
+      default_value: string | null
+      primary_key: boolean
+    }>(LIST_COLUMNS_OF, [tables.map((t) => t.schema ?? null), tables.map((t) => t.name)])
+    for (const r of rows) {
+      // `place` is a bigint, so it arrives as a string.
+      columns[Number(r.place) - 1]?.push({
+        name: r.name,
+        dataType: r.data_type,
+        nullable: r.nullable,
+        defaultValue: r.default_value,
+        primaryKey: r.primary_key
+      })
+    }
+    return columns
+  }
+
+  async listForeignKeys(): Promise<ForeignKeyInfo[]> {
+    const { rows } = await this.connection().query<{
+      name: string
+      schema: string
+      table: string
+      ref_schema: string
+      ref_table: string
+      columns: string[]
+      ref_columns: string[]
+      on_update: string
+      on_delete: string
+    }>(LIST_FOREIGN_KEYS)
+    return rows.map((r) => ({
+      name: r.name,
+      table: { schema: r.schema, name: r.table },
+      columns: r.columns,
+      references: { schema: r.ref_schema, name: r.ref_table },
+      referencedColumns: r.ref_columns,
+      onUpdate: FK_ACTIONS[r.on_update] ?? r.on_update,
+      onDelete: FK_ACTIONS[r.on_delete] ?? r.on_delete
     }))
   }
 

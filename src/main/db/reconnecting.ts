@@ -1,4 +1,4 @@
-import type { ColumnInfo, QueryResult, TableInfo, TableRef } from '@shared/types'
+import type { ColumnInfo, ForeignKeyInfo, QueryResult, TableInfo, TableRef } from '@shared/types'
 import type { DbClient } from './client'
 import { FIRST_WORD } from './limit'
 
@@ -110,6 +110,14 @@ export class ReconnectingClient implements Omit<DbClient, 'onLost'> {
 
   async listColumns(table: TableRef): Promise<ColumnInfo[]> {
     return (await this.live()).listColumns(table)
+  }
+
+  async listColumnsOf(tables: TableRef[]): Promise<ColumnInfo[][]> {
+    return (await this.live()).listColumnsOf(tables)
+  }
+
+  async listForeignKeys(): Promise<ForeignKeyInfo[]> {
+    return (await this.live()).listForeignKeys()
   }
 
   async query(sql: string, params?: unknown[]): Promise<QueryResult> {

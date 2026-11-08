@@ -35,6 +35,14 @@ class FakeClient implements DbClient {
     this.ran.push('listColumns')
     return []
   }
+  async listColumnsOf(): Promise<[]> {
+    this.ran.push('listColumnsOf')
+    return []
+  }
+  async listForeignKeys(): Promise<[]> {
+    this.ran.push('listForeignKeys')
+    return []
+  }
   query(sql: string): Promise<QueryResult> {
     this.ran.push(sql)
     if (!this.hold) return Promise.resolve(RESULT)
