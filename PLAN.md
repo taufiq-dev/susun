@@ -318,7 +318,8 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     built app with real key presses; the 10b, 10c and fixes 1-5 tests still pass.
   - [x] **Title bar in the theme** (asked for after the design fixes) — macOS can't recolour its title bar, so
     on macOS the window has none (`titleBarStyle: 'hidden'`) and the page's 40 px top band takes its place:
-    the workspace header, or on the connect screen the sidebar's name row and an empty band over the form.
+    the workspace header (with "Trowel" centred in it, as a window title is), or on the connect screen the
+    sidebar's name row and an empty band over the form.
     The traffic lights sit at (14, 13) in its first 80 px; the band drags the window, and what's clickable
     in it is marked no-drag. Windows and Linux keep their system title bar. Tested in the built app: no
     title bar (content starts at the window's top), the bands' sizes and drag regions, the header's buttons
