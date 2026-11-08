@@ -48,22 +48,40 @@ export function closeTab(connectionId: string, tabId: string): Promise<boolean> 
   })
 }
 
-// Before every tab closes (disconnecting, switching, or the window closing): asks once about all the query
-// tabs with unsaved SQL, and saves them if the user chooses Save All, showing each one as its Save
-// dialog opens. Resolves to whether the tabs may close.
-export function settleUnsaved(reason: Exclude<CloseReason, 'close-tab'>): Promise<boolean> {
+// Asks once about all the tabs with unsaved changes, and saves them if the user chooses Save All,
+// showing each one as its Save dialog opens. Resolves to whether the tabs may close.
+async function settle(tabs: Tab[], reason: CloseReason): Promise<boolean> {
+  const dirty = tabs.filter(isUnsaved)
+  if (dirty.length === 0) return true
+  const choice = await window.api.app.confirmSave(
+    dirty.map((t) => t.title),
+    reason
+  )
+  if (choice !== 'save') return choice === 'discard'
+  for (const tab of dirty) {
+    useTabs.getState().activate(tab.id)
+    if (!(await saveChanges(tab))) return false
+  }
+  return true
+}
+
+// Closes several tabs and their sessions (a tab's Close others and Close to the right), first
+// asking once about those with unsaved changes. Resolves to whether they closed: none do if the
+// user cancelled, or chose Save and then cancelled a Save dialog.
+export function closeTabs(connectionId: string, tabIds: string[]): Promise<boolean> {
   return oneAtATime(async () => {
-    const dirty = useTabs.getState().tabs.filter(isUnsaved)
-    if (dirty.length === 0) return true
-    const choice = await window.api.app.confirmSave(
-      dirty.map((t) => t.title),
-      reason
-    )
-    if (choice !== 'save') return choice === 'discard'
-    for (const tab of dirty) {
-      useTabs.getState().activate(tab.id)
-      if (!(await saveChanges(tab))) return false
+    const tabs = useTabs.getState().tabs.filter((t) => tabIds.includes(t.id))
+    if (!(await settle(tabs, 'close-tab'))) return false
+    for (const tab of tabs) {
+      endSession(connectionId, tab.id)
+      useTabs.getState().close(tab.id)
     }
     return true
   })
+}
+
+// Before every tab closes (disconnecting, switching, or the window closing): asks once about all
+// the tabs with unsaved changes. Resolves to whether the tabs may close.
+export function settleUnsaved(reason: Exclude<CloseReason, 'close-tab'>): Promise<boolean> {
+  return oneAtATime(() => settle(useTabs.getState().tabs, reason))
 }

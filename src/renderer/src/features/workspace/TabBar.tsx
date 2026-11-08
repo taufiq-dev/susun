@@ -21,7 +21,7 @@ import type { Pane } from '@renderer/store/panes'
 import { endTabDrag, TAB_DRAG_TYPE, useDrag } from '@renderer/store/drag'
 import { useSession } from '@renderer/store/session'
 import { useTabs, type Tab } from '@renderer/store/tabs'
-import { closeTab, isUnsaved } from './closing'
+import { closeTab, closeTabs, isUnsaved } from './closing'
 import { MOD, focusPaneContent } from './shortcuts'
 
 // Once a tab closed from the keyboard is gone: focuses the tab now active in its pane, or the
@@ -93,9 +93,22 @@ export function TabBar({
     void closeTab(connectionId, id).then((closed) => closed && then?.())
   }
 
+  // Closes the pane's tabs that `which` picks, as VS Code's Close Others and Close to the Right do,
+  // then makes `keep` (the tab whose menu it was) the pane's active tab.
+  const closeSeveral = (keep: string, which: (id: string, index: number) => boolean): void => {
+    if (!connectionId) return
+    void closeTabs(connectionId, pane.tabIds.filter(which)).then((closed) => {
+      if (!closed) return
+      activate(keep)
+      focusActiveTab(pane.id)
+    })
+  }
+
   // A tab's right-click menu (shadcn's ContextMenu).
   const menu = (tab: Tab): React.JSX.Element => {
     const alone = pane.tabIds.length < 2
+    const index = pane.tabIds.indexOf(tab.id)
+    const last = index === pane.tabIds.length - 1
     return (
       <ContextMenuContent aria-label={`${tab.title} tab`}>
         <ContextMenuItem
@@ -140,6 +153,15 @@ export function TabBar({
         </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onClick={() => close(tab.id, focusFocusedPane)}>Close</ContextMenuItem>
+        <ContextMenuItem
+          disabled={alone}
+          onClick={() => closeSeveral(tab.id, (id) => id !== tab.id)}
+        >
+          Close others
+        </ContextMenuItem>
+        <ContextMenuItem disabled={last} onClick={() => closeSeveral(tab.id, (_, i) => i > index)}>
+          Close to the right
+        </ContextMenuItem>
       </ContextMenuContent>
     )
   }
