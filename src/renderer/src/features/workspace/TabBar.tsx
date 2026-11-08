@@ -93,14 +93,17 @@ export function TabBar({
     void closeTab(connectionId, id).then((closed) => closed && then?.())
   }
 
-  // Closes the pane's tabs that `which` picks, as VS Code's Close Others and Close to the Right do,
-  // then makes `keep` (the tab whose menu it was) the pane's active tab.
-  const closeSeveral = (keep: string, which: (id: string, index: number) => boolean): void => {
+  // Closes several of the pane's tabs, as VS Code's Close Others, Close to the Right and Close All
+  // do, then makes `keep` (the tab whose menu it was, if it stays) the pane's active tab. A pane
+  // left with no tabs goes, unless it's the only one.
+  const closeSeveral = (tabIds: string[], keep?: string): void => {
     if (!connectionId) return
-    void closeTabs(connectionId, pane.tabIds.filter(which)).then((closed) => {
+    void closeTabs(connectionId, tabIds).then((closed) => {
       if (!closed) return
-      activate(keep)
-      focusActiveTab(pane.id)
+      if (keep) {
+        activate(keep)
+        focusActiveTab(pane.id)
+      } else focusFocusedPane()
     })
   }
 
@@ -155,13 +158,22 @@ export function TabBar({
         <ContextMenuItem onClick={() => close(tab.id, focusFocusedPane)}>Close</ContextMenuItem>
         <ContextMenuItem
           disabled={alone}
-          onClick={() => closeSeveral(tab.id, (id) => id !== tab.id)}
+          onClick={() =>
+            closeSeveral(
+              pane.tabIds.filter((id) => id !== tab.id),
+              tab.id
+            )
+          }
         >
           Close others
         </ContextMenuItem>
-        <ContextMenuItem disabled={last} onClick={() => closeSeveral(tab.id, (_, i) => i > index)}>
+        <ContextMenuItem
+          disabled={last}
+          onClick={() => closeSeveral(pane.tabIds.slice(index + 1), tab.id)}
+        >
           Close to the right
         </ContextMenuItem>
+        <ContextMenuItem onClick={() => closeSeveral(pane.tabIds)}>Close all</ContextMenuItem>
       </ContextMenuContent>
     )
   }
