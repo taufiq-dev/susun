@@ -4,7 +4,7 @@ import { DiagramTab } from '@renderer/features/diagram/DiagramTab'
 import { QueryTab } from '@renderer/features/query/QueryTab'
 import { TableTab } from '@renderer/features/table/TableTab'
 import { useState } from 'react'
-import { TAB_DRAG_TYPE, useDrag } from '@renderer/store/drag'
+import { endTabDrag, TAB_DRAG_TYPE, useDrag } from '@renderer/store/drag'
 import { panesOf, type LayoutNode, type Pane, type Side, type Split } from '@renderer/store/panes'
 import { useTabs } from '@renderer/store/tabs'
 import { focusPaneContent } from './shortcuts'
@@ -306,6 +306,7 @@ function DropZones({ pane, tabId }: { pane: Pane; tabId: string }): React.JSX.El
       onDrop={(e) => {
         const z = zoneAt(e)
         setZone(null)
+        endTabDrag()
         if (!allowed(z)) return
         e.preventDefault()
         if (z === 'centre') moveTab(tabId, pane.id, pane.tabIds.length)

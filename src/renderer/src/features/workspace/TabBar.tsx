@@ -18,7 +18,7 @@ import {
 import { IconButton } from '@renderer/components/ui'
 import { useRevealSelected } from '@renderer/components/useRevealSelected'
 import type { Pane } from '@renderer/store/panes'
-import { TAB_DRAG_TYPE, useDrag } from '@renderer/store/drag'
+import { endTabDrag, TAB_DRAG_TYPE, useDrag } from '@renderer/store/drag'
 import { useSession } from '@renderer/store/session'
 import { useTabs, type Tab } from '@renderer/store/tabs'
 import { closeTab, isUnsaved } from './closing'
@@ -161,6 +161,7 @@ export function TabBar({
       onDrop={(e) => {
         const tabId = e.dataTransfer.getData(TAB_DRAG_TYPE)
         setDropIndex(null)
+        endTabDrag()
         if (!tabId) return
         e.preventDefault()
         moveTab(tabId, pane.id, indexAt(e.clientX))
@@ -194,7 +195,7 @@ export function TabBar({
                   useDrag.getState().start(tab.id)
                 }}
                 onDragEnd={() => {
-                  useDrag.getState().end()
+                  endTabDrag()
                   setDropIndex(null)
                 }}
                 className={`group relative flex max-w-52 shrink-0 items-center border-r border-line ${

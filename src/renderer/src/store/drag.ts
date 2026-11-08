@@ -13,5 +13,12 @@ export const useDrag = create<DragState>()((set) => ({
   end: () => set({ tabId: null })
 }))
 
+// Ends the drag. A drop calls it as well as the dragged tab's dragend: a tab dropped into another
+// pane is a new element there, and the old one is gone before its dragend, which React then never
+// sees. A drag left on would keep each pane's drop zones over its content, taking its clicks.
+export function endTabDrag(): void {
+  useDrag.getState().end()
+}
+
 // The drag's data type, so drops of anything else (files, text) are ignored.
 export const TAB_DRAG_TYPE = 'application/x-trowel-tab'
