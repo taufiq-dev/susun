@@ -3,12 +3,14 @@ productName: Susun
 directories:
   buildResources: build
 files:
-  - '!**/.vscode/*'
-  - '!src/*'
-  - '!electron.vite.config.{js,ts,mjs,cjs}'
-  - '!{.eslintcache,eslint.config.mjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
-  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
-  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  # Only what the app runs: the built code and its resources. electron-builder adds package.json and
+  # the production dependencies itself.
+  - out/**
+  - resources/**
+  # better-sqlite3 ships its C sources and a prebuilt binary for every platform, and loads only the
+  # binary for its own. (A platform section's `files` would replace these patterns, not add to them.)
+  - '!node_modules/better-sqlite3/{deps,src}/**'
+  - '!node_modules/better-sqlite3/prebuilds/!(${platform}-*).node'
 asarUnpack:
   - resources/**
 win:
@@ -41,6 +43,5 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
-publish:
-  provider: generic
-  url: https://example.com/auto-updates
+# No auto-updates (electron-updater was removed), so no update files next to the packages.
+publish: null

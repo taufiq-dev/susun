@@ -104,13 +104,14 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 
 - pnpm 11 only reads auth/registry settings from `.npmrc`; other pnpm settings go in `pnpm-workspace.yaml`.
 - `pnpm-workspace.yaml` sets `nodeLinker: hoisted` (flat `node_modules`, which electron-builder and native-module rebuilds expect). Changing it requires deleting `node_modules` and running `pnpm install` again.
+- Only packages the main process or preload load at runtime go in `dependencies` (now `pg`, `pg-cursor`, `mysql2`, `better-sqlite3` and the two `@electron-toolkit` helpers): electron-vite leaves those out of the main and preload bundles, and electron-builder copies them into the app. Everything the renderer uses goes in `devDependencies`, since Vite bundles it into `out/renderer` anyway; in `dependencies` it would be packed a second time (it was 70 MB of the app). `electron-builder.yml` packs only `out/` and `resources/` (plus `package.json` and those dependencies), drops better-sqlite3's C sources and its prebuilt binaries for other platforms, and has `publish: null` (no auto-updates). Its patterns go in the root `files`: a platform section's `files` replaces them, which once packed `.git` and `dist/` into the app.
 - Dependencies with install scripts must be listed under `allowBuilds` in `pnpm-workspace.yaml`, or `pnpm install` fails with `ERR_PNPM_IGNORED_BUILDS` (e.g. add `better-sqlite3: true` when adding it).
 - `postinstall` runs `install-electron` (downloads the Electron binary) and `electron-builder install-app-deps` (rebuilds native modules for Electron's Node ABI). `electron-builder.yml` sets `npmRebuild: false`, so packaging relies on that postinstall rebuild; on a `NODE_MODULE_VERSION` error run `pnpm exec electron-builder install-app-deps`.
 - Do not read `.npmrc`: a user hook blocks any Bash command that mentions it, because it can hold auth tokens. It is gitignored.
 
 ## Template placeholders still to replace
 
-`appId: com.electron.app` and `publish.url` (example.com) in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, and `author`/`homepage` in `package.json`.
+`appId: com.electron.app` in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, and `author`/`homepage` in `package.json`.
 
 ## Beekeeper Studio reference and licensing
 
