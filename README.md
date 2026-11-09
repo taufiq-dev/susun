@@ -23,6 +23,11 @@ and it's what the logo draws: three rows stacked in order, the top one tipped wi
 
 ### SQL editor
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/editor-dark.png">
+  <img src="docs/images/editor-light.png" alt="A script opened from the Saved queries list: four statements that restock products running low and report on stock, and below them each statement's line, result and time">
+</picture>
+
 - Syntax highlighting and keyword completion in each database's own dialect.
 - **⌘Enter** runs the selection, or the whole script. Susun splits a script into statements the way
   psql, the mysql client and sqlite3 do (quotes, comments, Postgres dollar quotes, MySQL
