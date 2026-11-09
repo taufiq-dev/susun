@@ -7,7 +7,7 @@ function App(): React.JSX.Element {
   const session = useSession((s) => s.session)
 
   useEffect(() => {
-    document.title = session ? `${session.name} — Trowel` : 'Trowel'
+    document.title = session ? `${session.name} — Susun` : 'Susun'
   }, [session])
 
   // Keyed by connection so a new connection starts with fresh workspace state.

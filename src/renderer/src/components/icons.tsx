@@ -30,7 +30,7 @@ import {
   type LucideIcon
 } from 'lucide-react'
 
-// Trowel's icons, from Lucide (lucide-react, the icon set shadcn/ui uses). Each is named for what
+// Susun's icons, from Lucide (lucide-react, the icon set shadcn/ui uses). Each is named for what
 // it means here, and its size is set here, so components don't pick glyphs or sizes themselves.
 // They draw in the text colour (currentColor), so they follow the theme and the accent.
 

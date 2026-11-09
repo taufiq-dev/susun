@@ -1,5 +1,5 @@
 // Each connection's query library: the .sql files saved or opened while connected to it, and the
-// history of its runs. Both are in trowel.db (store.ts), filed under the connection's key.
+// history of its runs. Both are in susun.db (store.ts), filed under the connection's key.
 import { stat } from 'fs/promises'
 import type { ConnectionConfig, HistoryEntry, NewHistoryEntry, QueryFileEntry } from '@shared/types'
 import { store } from './store'

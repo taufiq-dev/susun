@@ -21,4 +21,4 @@ export function endTabDrag(): void {
 }
 
 // The drag's data type, so drops of anything else (files, text) are ignored.
-export const TAB_DRAG_TYPE = 'application/x-trowel-tab'
+export const TAB_DRAG_TYPE = 'application/x-susun-tab'

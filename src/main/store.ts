@@ -1,4 +1,4 @@
-// trowel.db in the app's userData folder: saved connections (connections.ts), settings
+// susun.db in the app's userData folder: saved connections (connections.ts), settings
 // (settings.ts), and each connection's query files and history (library.ts). better-sqlite3 is synchronous, which is fine for tables this small.
 import { join } from 'path'
 import Database from 'better-sqlite3'
@@ -40,7 +40,7 @@ let db: Database.Database | undefined
 
 export function store(): Database.Database {
   if (db) return db
-  const opened = new Database(join(app.getPath('userData'), 'trowel.db'))
+  const opened = new Database(join(app.getPath('userData'), 'susun.db'))
   const version = opened.pragma('user_version', { simple: true }) as number
   for (let v = version; v < MIGRATIONS.length; v++) {
     opened.transaction(() => {

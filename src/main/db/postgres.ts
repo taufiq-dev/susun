@@ -145,7 +145,7 @@ function clientConfig(config: ServerConnectionConfig): ClientConfig {
     keepAlive: true,
     keepAliveInitialDelayMillis: KEEPALIVE_DELAY_MS,
     stream: () => new GuardedSocket(),
-    application_name: 'Trowel',
+    application_name: 'Susun',
     types: TYPES
   }
 }

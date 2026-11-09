@@ -160,7 +160,7 @@ export function ConnectScreen(): React.JSX.Element {
               : 'px-4 pt-4 pb-3 text-[15px] font-semibold'
           }
         >
-          Trowel
+          Susun
         </h1>
         <h2 className="px-4 pb-1.5 text-[12px] text-muted frameless:pt-2">Saved connections</h2>
         <div className="min-h-0 flex-1 overflow-y-auto">

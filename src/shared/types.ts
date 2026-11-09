@@ -101,7 +101,7 @@ export interface QueryResult {
   durationMs: number
 }
 
-// The app's settings, kept in trowel.db and changed in the Settings window.
+// The app's settings, kept in susun.db and changed in the Settings window.
 export interface Settings {
   // Before a query tab with unsaved SQL closes (on its own, or when disconnecting, closing the
   // window or quitting), ask whether to save it. The prompt's "Don't ask again" turns this off.

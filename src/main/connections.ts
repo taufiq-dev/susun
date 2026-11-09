@@ -1,4 +1,4 @@
-// Saved connections, kept in trowel.db (store.ts). Passwords are encrypted with safeStorage (the
+// Saved connections, kept in susun.db (store.ts). Passwords are encrypted with safeStorage (the
 // macOS Keychain, Windows DPAPI or the Linux secret store) and decrypted again for the renderer, so
 // they are protected only at rest. The async safeStorage calls don't block the main process if the
 // OS shows a keychain prompt.

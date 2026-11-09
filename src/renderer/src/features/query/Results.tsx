@@ -38,12 +38,12 @@ function truncatedHint(result: QueryResult): string | undefined {
   const limit = ROW_LIMIT.toLocaleString()
   if (result.stopped) {
     return (
-      `Trowel keeps ${limit} rows of a result, so it stopped the query there: nothing past that ` +
+      `Susun keeps ${limit} rows of a result, so it stopped the query there: nothing past that ` +
       'point ran, including functions it would have called for later rows. Narrow it with WHERE ' +
       'or LIMIT to see other rows.'
     )
   }
-  return `The statement ran to the end, but returned more rows than the ${limit} Trowel keeps.`
+  return `The statement ran to the end, but returned more rows than the ${limit} Susun keeps.`
 }
 
 function returnsRows(s: StatementRun): boolean {

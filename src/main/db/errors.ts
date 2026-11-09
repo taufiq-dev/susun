@@ -12,7 +12,7 @@ export const KEEPALIVE_DELAY_MS = 30_000
 
 // The code of the error `GuardedSocket` (postgres.ts) fails a connection with when the server
 // doesn't speak the Postgres protocol.
-export const NOT_POSTGRES = 'ERR_TROWEL_NOT_POSTGRES'
+export const NOT_POSTGRES = 'ERR_SUSUN_NOT_POSTGRES'
 
 // An error's message. Connecting to "localhost" tries ::1 and 127.0.0.1, and if both fail Node
 // throws an AggregateError with an empty message; its inner errors say what happened.

@@ -40,7 +40,7 @@ export const useLayout = create<LayoutState>()(
       setSidebarView: (sidebarView) => set({ sidebarView })
     }),
     {
-      name: 'trowel-layout',
+      name: 'susun-layout',
       partialize: (s) => ({ widths: s.widths, sidebarView: s.sidebarView }),
       // Takes the saved widths that are numbers and a known view, keeping the defaults for the rest
       // (such as a panel added since they were saved).

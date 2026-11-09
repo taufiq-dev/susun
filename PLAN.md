@@ -1,16 +1,16 @@
-# Trowel build plan
+# Susun build plan
 
-Progress tracker for building Trowel. Tick steps off as they land and keep "Open decisions" current.
+Progress tracker for building Susun. Tick steps off as they land and keep "Open decisions" current.
 Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 ## Open decisions (ask the user before acting)
 
-- **License for Trowel** (MIT, GPLv3 or closed): needed before distributing it (step 13).
+- **License for Susun** (MIT, GPLv3 or closed): needed before distributing it (step 13).
 
 ## Later (noted, to look at after step 11)
 
 - The rest of a table's right-click menu: Rename, Duplicate, Hide, SQL: Create (Postgres has no built-in
-  DDL dump, so Trowel would rebuild it), Export to file, Import from file.
+  DDL dump, so Susun would rebuild it), Export to file, Import from file.
 - A query still running on a tab whose SQL is saved closes with no prompt (the save prompt only asks about
   unsaved SQL; Disconnect's old confirmation asked about running queries too).
 - Unsaved SQL is lost on quit when the user chooses Don't Save (keeping query tabs between launches would
@@ -20,24 +20,24 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 ## Decided
 
 - **shadcn/ui where it beats hand-made code, and its icon set** (the user's choice). Lucide for every icon;
-  shadcn's components (on Base UI, its default) for menus, tooltips and the switch, restyled to Trowel's
+  shadcn's components (on Base UI, its default) for menus, tooltips and the switch, restyled to Susun's
   compact look and colours, without animations. Not for the simple controls (buttons, inputs), the pane
-  splits or the resizable side panels (shadcn's Resizable works in percentages, Trowel's panels in pixels).
+  splits or the resizable side panels (shadcn's Resizable works in percentages, Susun's panels in pixels).
 - **A sidebar with an activity bar, and a connection bar** (the user's choices, after Beekeeper Studio's
   layout). The left side has views for tables, saved queries and recent queries, and at its foot the
   connection's name and type, whose menu disconnects, edits or switches the connection. Saved queries lists
-  the `.sql` files saved or opened while connected to that database (not a list kept inside Trowel); recent
+  the `.sql` files saved or opened while connected to that database (not a list kept inside Susun); recent
   queries are that connection's runs, the last 1,000. Edit connection disconnects and opens the form. The
   connection's name and Disconnect leave the top bar.
 - **Unsaved SQL: a save prompt, query files and a Settings window** (the user's choices). Closing a query tab
   with unsaved SQL, disconnecting, closing the window or quitting asks first, in the native dialog (a sheet on
   macOS) with Save, Don't Save, Cancel and "Don't ask again"; Disconnect uses it too, in place of its
   two-click confirmation. Save writes a `.sql` file, through the Save dialog, and the tab stays on that file
-  (rather than a saved-queries list inside Trowel). "Don't ask again" turns off a setting in a separate
-  Settings window (Trowel > Settings…, Cmd+,), which needs a custom app menu.
+  (rather than a saved-queries list inside Susun). "Don't ask again" turns off a setting in a separate
+  Settings window (Susun > Settings…, Cmd+,), which needs a custom app menu.
 - **Split panes, as in VS Code.** The tab area splits right or down, nested, into resizable panes, each with
   its own tabs; tabs move between panes by dragging, or onto a pane's edge to split it. One of the reasons
-  for building Trowel: Beekeeper Studio shows one tab at a time.
+  for building Susun: Beekeeper Studio shows one tab at a time.
 - **Each query tab has its own database session**, opened on its first run and closed with the tab; the
   sidebar and table tabs share the connection's own session. Sharing one session was already wrong with one
   tab visible (measured on Postgres with two tabs running: Cancel in tab B stopped tab A's query and B's ran
@@ -47,7 +47,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   its `max_connections`, which on a production database it shares with the application; on SQLite one more
   process, about 15 MB (measured), and a tab holding a write transaction makes other tabs' writes wait
   (better-sqlite3's 5-second busy timeout, then "database is locked"). Opening one took 32 ms on local
-  Postgres and 61 ms on SQLite. No extra compute: idle sessions run nothing (Trowel sends no keepalive
+  Postgres and 61 ms on SQLite. No extra compute: idle sessions run nothing (Susun sends no keepalive
   queries), and a serverless database (Neon, Aurora Serverless v2) is kept awake by any open connection,
   which the connection's own session already is. Uncommitted work in a tab isn't seen by other tabs, table
   tabs or the sidebar. Not done: closing sessions that have been idle a while (would free connection slots,
@@ -63,7 +63,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 
 - **No Beekeeper Studio code.** None of it is copied or ported, GPLv3 or commercial. The clone is only for
   seeing how it approaches a problem.
-- **Scripts: one result per statement, split by Trowel.** The editor's SQL is split into statements and they
+- **Scripts: one result per statement, split by Susun.** The editor's SQL is split into statements and they
   run one at a time on the connection, stopping at the first error, as psql, the mysql client and sqlite3 do:
   each commits on its own unless the script has its own BEGIN/COMMIT, and statements before an error keep
   their effect. No mysql2 `multipleStatements`. The splitter is our own, in `src/shared/`, following each
@@ -158,7 +158,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   renderer as plain `Error`s with the driver's message, and a window's connections close when it closes or
   reloads. Tested end to end in the built app over the DevTools protocol (Postgres 18, MariaDB 13, SQLite).
 - [x] **7. Saved connections** — SQLite file under `app.getPath('userData')` via `better-sqlite3`; encrypt
-  passwords with `safeStorage.encryptString()`. Done as `src/main/connections.ts` (`trowel.db`, one
+  passwords with `safeStorage.encryptString()`. Done as `src/main/connections.ts` (`susun.db`, one
   `connections` table, `pragma user_version` migrations) and `api.connections.list/save/remove`. Uses the async
   `safeStorage` calls instead, which don't block the main process during a keychain prompt and re-encrypt after
   a key rotation. Passwords come back decrypted to the renderer. Tested end to end in the built app with a
@@ -318,7 +318,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     built app with real key presses; the 10b, 10c and fixes 1-5 tests still pass.
   - [x] **Title bar in the theme** (asked for after the design fixes) — macOS can't recolour its title bar, so
     on macOS the window has none (`titleBarStyle: 'hidden'`) and the page's 40 px top band takes its place:
-    the workspace header (with "Trowel" centred in it, as a window title is), or on the connect screen the
+    the workspace header (with "Susun" centred in it, as a window title is), or on the connect screen the
     sidebar's name row and an empty band over the form.
     The traffic lights sit at (14, 13) in its first 80 px; the band drags the window, and what's clickable
     in it is marked no-drag. Windows and Linux keep their system title bar. Tested in the built app: no
@@ -331,7 +331,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     resize (it was the strip's top edge). Tested in the built app: no fill or borders, Run 8 px from the
     pane's edge, the line following a 100 px drag; the 9a, fixes and keyboard tests still pass.
   - [x] **10d. Drag tabs** — reorder within a tab bar, move to another pane, or drop on a pane's edge to split.
-    Tabs drag with HTML drag and drop (data type `application/x-trowel-tab`; `store/drag.ts` says which tab
+    Tabs drag with HTML drag and drop (data type `application/x-susun-tab`; `store/drag.ts` says which tab
     is being dragged). A tab bar shows an accent line where the tab would land (before the tab whose middle is
     past the pointer, or after the last) and moves it there (`moveTab`, a reorder in its own pane). While a tab
     is dragged, each pane's content gets a layer over its editor or grid (which would otherwise take the drag)
@@ -357,7 +357,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
       at the first one cancelled. The message says why: before disconnecting, closing the window or quitting.
     - Closing a main window is held back until its page has settled its unsaved tabs (`windows.ts`); a
       cancelled close also cancels a quit, which starts again once the window may close.
-    - Settings: a `settings` table in trowel.db (migration 2; `store.ts` now holds the migrations) and a
+    - Settings: a `settings` table in susun.db (migration 2; `store.ts` now holds the migrations) and a
       Settings window with one setting, "Ask to save a query tab's SQL before closing it", which "Don't ask
       again" turns off and every window hears about at once.
     Tested in the built app, with the main process's dialogs replaced by stubs from its inspector: each
@@ -397,7 +397,7 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
     style on Base UI 1.9) replaces the hand-made menu: each tab's right-click menu is its ContextMenu, the
     connection bar's menu its DropdownMenu (with a submenu for Switch connection); icon buttons, the
     activity bar and Run/Cancel have its Tooltip (400 ms before the first, then at once); the Settings
-    checkbox is its Switch. The components are restyled to Trowel's tokens and sizes, without animations.
+    checkbox is its Switch. The components are restyled to Susun's tokens and sizes, without animations.
     `cn` (clsx, tailwind-merge) now lets a caller's classes override a component's. Kept as they were:
     buttons, inputs, the segmented pickers, side panels and pane splits, tab bars. Tested in the built app:
     tooltip timing and placement; the tab menu's items, disabled ones, Split right moving the focus to the
@@ -519,6 +519,6 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
 - [ ] **13. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
   Developer account for signing and notarization. Check that SQLite works in the packaged app: its utility
-  process (`sqlite.process.ts`) loads the native `better-sqlite3` from inside the asar, untested so far. Settle the app name (`trowel` now) before anyone relies on
-  saved connections: the userData folder and the keychain entry (`<name> Safe Storage`) are both named after it,
-  so a rename later loses saved connections or lists their passwords as empty.
+  process (`sqlite.process.ts`) loads the native `better-sqlite3` from inside the asar, untested so far. The app name is settled as Susun (renamed from Trowel on 9 Nov 2026):
+  the userData folder and the keychain entry (`<name> Safe Storage`) are both named after it, so another
+  rename would lose saved connections or list their passwords as empty.

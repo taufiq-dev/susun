@@ -1,4 +1,4 @@
-// The app's settings, one row per key in trowel.db's settings table (store.ts), with
+// The app's settings, one row per key in susun.db's settings table (store.ts), with
 // DEFAULT_SETTINGS for any not stored. A change is sent to every window.
 import { BrowserWindow } from 'electron'
 import type { AppEvents } from '@shared/api'

@@ -30,7 +30,7 @@ export function Workspace({ session }: { session: Session }): React.JSX.Element 
       <header className="relative flex h-10 shrink-0 items-center border-b border-line bg-sunken pr-2 pl-3 select-none frameless:app-drag frameless:pl-20">
         {FRAMELESS && (
           <h1 className="pointer-events-none absolute inset-x-0 text-center font-semibold">
-            Trowel
+            Susun
           </h1>
         )}
         <div className="relative ml-auto flex shrink-0 items-center gap-1 app-no-drag">

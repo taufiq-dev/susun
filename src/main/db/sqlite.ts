@@ -18,7 +18,7 @@ interface Pending {
 
 // The cancelled query's error.
 const CANCELLED =
-  'SQLite can’t stop a query in place, so Trowel reopened the database: an open transaction was ' +
+  'SQLite can’t stop a query in place, so Susun reopened the database: an open transaction was ' +
   'rolled back, and temporary tables, attached databases and settings were reset.'
 
 // Each connection gets its own utility process (see sqlite.process.ts), so a slow SQLite query
@@ -92,7 +92,7 @@ export class SqliteClient implements DbClient {
 
   // Starts a process for the connection and opens the file in it.
   private async start(): Promise<void> {
-    const child = utilityProcess.fork(sqliteProcessPath, [], { serviceName: 'Trowel SQLite' })
+    const child = utilityProcess.fork(sqliteProcessPath, [], { serviceName: 'Susun SQLite' })
     this.child = child
     child.on('message', (res: SqliteResponse) => {
       const pending = this.pending.get(res.id)
