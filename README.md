@@ -138,6 +138,7 @@ pnpm lint          # ESLint
 pnpm typecheck     # TypeScript, main and renderer
 pnpm build         # typecheck, then build into out/
 pnpm build:mac     # package with electron-builder into dist/ (also build:win, build:linux)
+pnpm icons         # remake the app icons from the logo (needs rsvg-convert)
 ```
 
 Susun is built with Electron, React, TypeScript and Vite (electron-vite). The database drivers

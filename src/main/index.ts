@@ -2,6 +2,7 @@ import { app, nativeTheme, BrowserWindow } from 'electron'
 import { electronApp, optimizer } from '@electron-toolkit/utils'
 import { registerIpc } from './ipc'
 import { setAppMenu } from './menu'
+import icon from '../../resources/icon.png?asset'
 import { createMainWindow, hasMainWindow, windowBackground } from './windows'
 
 // This method will be called when Electron has finished
@@ -10,6 +11,10 @@ import { createMainWindow, hasMainWindow, windowBackground } from './windows'
 app.whenReady().then(() => {
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
+
+  // In development the app runs as Electron's own app bundle, whose icon the Dock would show (and
+  // whose name the menu bar does: that only changes in a packaged build).
+  if (process.platform === 'darwin' && !app.isPackaged) app.dock?.setIcon(icon)
 
   // Default open or close DevTools by F12 in development
   // and ignore CommandOrControl + R in production.

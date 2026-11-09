@@ -22,7 +22,10 @@ pnpm format              # Prettier --write
 pnpm build               # typecheck, then electron-vite build into out/
 pnpm start               # run the built app from out/
 pnpm build:mac           # package with electron-builder into dist/ (also build:win, build:linux, build:unpack)
+pnpm icons               # remake the app icons from the logo (scripts/icons.mts; needs rsvg-convert)
 ```
+
+The app icons (`build/icon.{svg,png,icns,ico}`, which electron-builder picks up from `build/`, and `resources/icon.png`) are made from `src/renderer/src/assets/susun-logo.svg` by `pnpm icons`: the symbol on a warm off-white tile, in macOS's 824-on-1024 layout. In development the app runs as Electron's own `Electron.app`, so `index.ts` sets the Dock icon to `resources/icon.png`, but the menu bar and app switcher still say "Electron" (a packaged build says Susun).
 
 `build:mac` and `build:linux` skip the typecheck (they call `electron-vite build` directly); `build:win` and `build:unpack` go through `pnpm build`. Vitest (`vitest.config.ts`, which repeats the `@shared` alias) covers pure code such as the SQL splitter; the database clients and UI are tested by driving the built app (below).
 

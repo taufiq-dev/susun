@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <title>Susun</title>
+  <defs>
+    <linearGradient id="icon-tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FDFBF8"/>
+      <stop offset="1" stop-color="#F3EEE8"/>
+    </linearGradient>
+    <filter id="icon-shadow" x="-10%" y="-10%" width="120%" height="125%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+      <feOffset dy="10"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.3"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <rect x="100" y="100" width="824" height="824" rx="185" fill="url(#icon-tile)" filter="url(#icon-shadow)"/>
+  <rect x="101" y="101" width="822" height="822" rx="184" fill="none" stroke="#000" stroke-opacity="0.07" stroke-width="2"/>
+  <g transform="translate(280.00 317.70) scale(2.62564)">
+    <defs><clipPath id="top-row"><path d="M0.000000 10.000000 Q0.000000 0.000000 10.000000 0.000000 L188.249021 0.000000 Q195.000000 0.000000 191.757406 5.921258 L173.138358 39.921258 Q172.000000 42.000000 169.629973 42.000000 L10.000000 42.000000 Q0.000000 42.000000 0.000000 32.000000 Z"/></clipPath><linearGradient id="slope-feather" gradientUnits="userSpaceOnUse" x1="135.368436" y1="20.927953" x2="135.631564" y2="21.072047"><stop offset="0" stop-color="#263740"/><stop offset="1" stop-color="#C57450"/></linearGradient></defs>
+    <g clip-path="url(#top-row)">
+    <path fill="#263740" d="M0 0H195V42H0Z"/>
+    <path fill="#C57450" d="M147 0H195V42H124Z"/>
+    <path fill="url(#slope-feather)" d="M146.828981 0H147.171019L124.171019 42H123.828981Z"/>
+    </g>
+    <path fill="#263740" d="M0.000000 64.000000 Q0.000000 54.000000 10.000000 54.000000 L153.249021 54.000000 Q160.000000 54.000000 156.757406 59.921258 L138.138358 93.921258 Q137.000000 96.000000 134.629973 96.000000 L10.000000 96.000000 Q0.000000 96.000000 0.000000 86.000000 Z"/>
+    <path fill="#263740" d="M0.000000 116.000000 Q0.000000 106.000000 10.000000 106.000000 L120.249021 106.000000 Q127.000000 106.000000 123.757406 111.921258 L105.138358 145.921258 Q104.000000 148.000000 101.629973 148.000000 L10.000000 148.000000 Q0.000000 148.000000 0.000000 138.000000 Z"/>
+  </g>
+</svg>
