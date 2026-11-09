@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import type { ConnectionConfig, SavedConnection } from '@shared/types'
+import { Logo } from '@renderer/components/Logo'
 import { MainArea, SidePanel } from '@renderer/components/SidePanel'
 import { Button, DbMark } from '@renderer/components/ui'
 import { FRAMELESS } from '@renderer/platform'
@@ -152,15 +153,15 @@ export function ConnectScreen(): React.JSX.Element {
   return (
     <div className="flex h-full">
       <SidePanel id="connections" side="left" resizeLabel="Resize the saved connections list">
-        {/* On macOS the name shares the window's top band with the traffic lights (frameless). */}
+        {/* On macOS the logo shares the window's top band with the traffic lights (frameless). */}
         <h1
           className={
             FRAMELESS
-              ? 'flex h-10 shrink-0 items-center pr-4 pl-20 font-semibold app-drag'
-              : 'px-4 pt-4 pb-3 text-[15px] font-semibold'
+              ? 'flex h-10 shrink-0 items-center pr-4 pl-23 app-drag'
+              : 'flex px-4 pt-4 pb-3'
           }
         >
-          Susun
+          <Logo />
         </h1>
         <h2 className="px-4 pb-1.5 text-[12px] text-muted frameless:pt-2">Saved connections</h2>
         <div className="min-h-0 flex-1 overflow-y-auto">

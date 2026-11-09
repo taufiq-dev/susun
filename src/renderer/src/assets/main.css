@@ -19,6 +19,8 @@
   --color-postgres: var(--postgres);
   --color-mysql: var(--mysql);
   --color-sqlite: var(--sqlite);
+  --color-logo: var(--logo);
+  --color-logo-accent: var(--logo-accent);
 }
 
 @theme {
@@ -44,6 +46,8 @@
     --syntax-number: #6a4bb3;
     --accent: #3d4049;
     --on-accent: #ffffff;
+    --logo: #263740;
+    --logo-accent: #c57450;
   }
 
   @media (prefers-color-scheme: dark) {
@@ -63,6 +67,7 @@
       --syntax-number: #b6a2ef;
       --accent: #c3c6ce;
       --on-accent: #15161a;
+      --logo: #d3dbe0;
     }
   }
 
