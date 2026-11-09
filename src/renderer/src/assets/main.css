@@ -20,7 +20,6 @@
   --color-mysql: var(--mysql);
   --color-sqlite: var(--sqlite);
   --color-logo: var(--logo);
-  --color-logo-accent: var(--logo-accent);
 }
 
 @theme {
@@ -47,7 +46,6 @@
     --accent: #3d4049;
     --on-accent: #ffffff;
     --logo: #263740;
-    --logo-accent: #c57450;
   }
 
   @media (prefers-color-scheme: dark) {

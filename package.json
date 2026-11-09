@@ -51,6 +51,7 @@
     "@electron-toolkit/eslint-config-prettier": "^3.0.1",
     "@electron-toolkit/eslint-config-ts": "^4.0.0",
     "@electron-toolkit/tsconfig": "^2.0.0",
+    "@svgr/plugin-svgo": "8.1.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/better-sqlite3": "^9.6.0",
     "@types/node": "^24.19.2",
@@ -72,6 +73,7 @@
     "tailwindcss": "^4.3.3",
     "typescript": "^5.9.3",
     "vite": "^8.3.4",
+    "vite-plugin-svgr": "5.2.0",
     "vitest": "^5.0.5"
   }
 }
