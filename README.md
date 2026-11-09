@@ -1,8 +1,5 @@
 <p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="docs/images/logo-dark.svg">
-    <img src="docs/images/logo-light.svg" alt="Susun" width="320">
-  </picture>
+  <img src="docs/images/logo.svg" alt="Susun" width="370">
 </p>
 
 <p align="center">
