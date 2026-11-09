@@ -19,6 +19,9 @@ nsis:
   uninstallDisplayName: ${productName}
   createDesktopShortcut: always
 mac:
+  # Unsigned until Susun has its own Developer ID: without this, electron-builder signs with any
+  # certificate it finds in the keychain.
+  identity: null
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.

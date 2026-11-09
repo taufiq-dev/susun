@@ -518,7 +518,10 @@ Architecture and conventions are in `CLAUDE.md`; this file is the order of work.
   readably opens at 80% on its own table rather than at 10-25%. `model.test.ts` covers the model.
 - [ ] **13. Packaging** — replace the template placeholders listed in `CLAUDE.md`; `pnpm build:mac` (or
   `build:win`/`build:linux`) writes installers to `dist/`. Sharing on macOS without warnings needs an Apple
-  Developer account for signing and notarization. Check that SQLite works in the packaged app: its utility
-  process (`sqlite.process.ts`) loads the native `better-sqlite3` from inside the asar, untested so far. The app name is settled as Susun (renamed from Trowel on 9 Nov 2026):
+  Developer account for signing and notarization. SQLite works in the packaged app (its utility process,
+  `sqlite.process.ts`, loads the native `better-sqlite3` from inside the asar): checked on 9 Nov 2026
+  in an unpacked arm64 build. macOS builds are unsigned for now (`mac.identity: null`), so
+  electron-builder doesn't sign with whatever certificate is in the keychain (it found one from
+  another Apple team); an unsigned build opens on the Mac that built it, but downloaded copies won't. The app name is settled as Susun (renamed from Trowel on 9 Nov 2026):
   the userData folder and the keychain entry (`<name> Safe Storage`) are both named after it, so another
   rename would lose saved connections or list their passwords as empty.
