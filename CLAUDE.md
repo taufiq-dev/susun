@@ -113,6 +113,10 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 
 `appId: com.electron.app` in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, and `author`/`homepage` in `package.json`.
 
+## License
+
+Apache-2.0: `LICENSE`, and `NOTICE`, the credit a fork must keep. Code and dependencies need a license that allows that (MIT, ISC, BSD or Apache-2.0); GPL code, Beekeeper Studio's included, can't go in, since it would make the app GPL.
+
 ## Beekeeper Studio reference and licensing
 
 A clone of Beekeeper Studio lives at `~/projects/beekeeper-studio` for reference.

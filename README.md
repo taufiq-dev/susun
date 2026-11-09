@@ -120,8 +120,7 @@ On Windows and Linux, use **Ctrl** in place of **⌘**.
 ## Status
 
 Susun is in active development, and installers aren't published yet: for now, build it from
-source. It's developed on macOS; Windows and Linux builds are set up with electron-builder. No
-license has been chosen yet.
+source. It's developed on macOS; Windows and Linux builds are set up with electron-builder.
 
 ## Development
 
@@ -145,3 +144,10 @@ small typed API. [`CLAUDE.md`](CLAUDE.md) describes the architecture in detail, 
 
 The screenshots use _kedai_ (Malay for "shop"), a made-up online shop selling kopi, kuih, batik and
 crafts. Every name and contact detail in it is invented.
+
+## License
+
+Susun is licensed under the [Apache License 2.0](LICENSE). You're welcome to fork it, change it and
+ship your own version, closed-source or not, as long as you credit Susun: include the license and
+the [`NOTICE`](NOTICE) file, and mark the files you changed. The license doesn't cover the Susun
+name or logo, so a fork goes by its own.
