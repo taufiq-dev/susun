@@ -115,7 +115,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 
 ## License
 
-Apache-2.0: `LICENSE`, and `NOTICE`, the credit a fork must keep. Code and dependencies need a license that allows that (MIT, ISC, BSD or Apache-2.0); GPL code, Beekeeper Studio's included, can't go in, since it would make the app GPL.
+MIT (`LICENSE`). Code and dependencies need a license that allows that (MIT, ISC, BSD or Apache-2.0); GPL code, Beekeeper Studio's included, can't go in, since it would make the app GPL.
 
 ## Beekeeper Studio reference and licensing
 

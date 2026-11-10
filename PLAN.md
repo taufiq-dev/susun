@@ -19,10 +19,9 @@ None right now.
 
 ## Decided
 
-- **Apache-2.0, with a NOTICE file** (the user's choice, 10 Nov 2026). Anyone may fork Susun, change it
-  and ship their own version, closed-source included, as long as they credit Susun: Apache-2.0 makes a
-  fork carry `NOTICE` and mark the files it changed, and gives no rights to the name or logo. (MIT's
-  credit, a copyright line in a licenses file, is easy to bury; GPLv3 would make forks stay open source.)
+- **MIT** (the user's choice, 10 Nov 2026, after a day on Apache-2.0 with a NOTICE file forks had to
+  keep). Anyone may use, fork, change and ship Susun, closed-source included, keeping only the license
+  and its copyright notice.
 - **shadcn/ui where it beats hand-made code, and its icon set** (the user's choice). Lucide for every icon;
   shadcn's components (on Base UI, its default) for menus, tooltips and the switch, restyled to Susun's
   compact look and colours, without animations. Not for the simple controls (buttons, inputs), the pane

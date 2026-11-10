@@ -152,7 +152,5 @@ crafts. Every name and contact detail in it is invented.
 
 ## License
 
-Susun is licensed under the [Apache License 2.0](LICENSE). You're welcome to fork it, change it and
-ship your own version, closed-source or not, as long as you credit Susun: include the license and
-the [`NOTICE`](NOTICE) file, and mark the files you changed. The license doesn't cover the Susun
-name or logo, so a fork goes by its own.
+Susun is licensed under the [MIT License](LICENSE): use it, fork it, change it and ship your own
+version, as long as the license and its copyright notice go with it.
