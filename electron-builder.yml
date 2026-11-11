@@ -1,4 +1,5 @@
-appId: com.electron.app
+# Reverse domain of susun.tech. Windows' AppUserModelId (src/main/index.ts) must match it.
+appId: tech.susun.app
 productName: Susun
 directories:
   buildResources: build

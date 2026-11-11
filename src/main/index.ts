@@ -10,7 +10,7 @@ import { createMainWindow, hasMainWindow, windowBackground } from './windows'
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
   // Set app user model id for windows
-  electronApp.setAppUserModelId('com.electron')
+  electronApp.setAppUserModelId('tech.susun.app')
 
   // In development the app runs as Electron's own app bundle, whose icon the Dock would show (and
   // whose name the menu bar does: that only changes in a packaged build).
