@@ -111,7 +111,7 @@ Two TypeScript projects: `tsconfig.node.json` (main, preload, shared, vite confi
 
 ## Template placeholders still to replace
 
-`appId: com.electron.app` in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, and `author`/`homepage` in `package.json`.
+`appId: com.electron.app` in `electron-builder.yml`, `setAppUserModelId('com.electron')` in `src/main/index.ts`, and `maintainer: electronjs.org` (the Linux packages' maintainer) in `electron-builder.yml`.
 
 ## License
 

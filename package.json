@@ -1,11 +1,19 @@
 {
   "name": "susun",
   "version": "1.0.0",
-  "description": "An Electron application with React and TypeScript",
+  "description": "A desktop database client for PostgreSQL, MySQL and SQLite",
   "main": "./out/main/index.js",
-  "author": "example.com",
+  "author": {
+    "name": "Taufiq",
+    "url": "https://github.com/taufiq-dev"
+  },
   "license": "MIT",
-  "homepage": "https://electron-vite.org",
+  "homepage": "https://github.com/taufiq-dev/susun",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/taufiq-dev/susun.git"
+  },
+  "bugs": "https://github.com/taufiq-dev/susun/issues",
   "scripts": {
     "format": "prettier --write .",
     "icons": "node scripts/icons.mts",
