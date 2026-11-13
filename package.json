@@ -8,12 +8,12 @@
     "url": "https://github.com/taufiq-dev"
   },
   "license": "MIT",
-  "homepage": "https://github.com/taufiq-dev/susun",
+  "homepage": "https://github.com/susun-tech/susun",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/taufiq-dev/susun.git"
+    "url": "git+https://github.com/susun-tech/susun.git"
   },
-  "bugs": "https://github.com/taufiq-dev/susun/issues",
+  "bugs": "https://github.com/susun-tech/susun/issues",
   "scripts": {
     "format": "prettier --write .",
     "icons": "node scripts/icons.mts",
